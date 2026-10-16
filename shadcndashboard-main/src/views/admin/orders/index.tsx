@@ -49,6 +49,16 @@ export default function RestaurantAdminOrders() {
   const filteredOrders = restaurantOrders.filter((order) => {
     if (statusFilter !== 'ALL' && order.status !== statusFilter) return false;
 
+    if (dateFilter === 'TODAY') {
+      const orderDate = new Date(order.createdAt).toISOString().split('T')[0];
+      const todayDate = new Date().toISOString().split('T')[0];
+      if (orderDate !== todayDate) return false;
+    } else if (dateFilter === 'WEEK') {
+      const orderTime = new Date(order.createdAt).getTime();
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      if (orderTime < sevenDaysAgo) return false;
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase();
       const match =
@@ -218,20 +228,31 @@ export default function RestaurantAdminOrders() {
                       {order.total.toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1.5 text-xs">
-                        {order.paymentMethod === 'ONLINE' ? (
-                          <CreditCard className="size-3.5 text-amber-600" />
+                      <div>
+                        {order.paymentStatus === 'PAID' ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 font-bold text-[10px] gap-1 py-0.5">
+                            <CheckCircle2 className="size-3 text-emerald-600" />
+                            <span>Paid</span>
+                          </Badge>
+                        ) : order.paymentStatus === 'FAILED' ? (
+                          <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800 font-bold text-[10px] gap-1 py-0.5">
+                            <Clock className="size-3 text-rose-600" />
+                            <span>Failed</span>
+                          </Badge>
                         ) : (
-                          <Banknote className="size-3.5 text-emerald-600" />
+                          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800 font-bold text-[10px] gap-1 py-0.5">
+                            <Clock className="size-3 text-amber-600" />
+                            <span>Pending</span>
+                          </Badge>
                         )}
-                        <span className="text-[11px] font-medium text-foreground">
-                          {order.paymentMethod} ({order.paymentStatus})
+                        <span className="text-[10px] text-muted-foreground block mt-0.5">
+                          {order.paymentMethod === 'ONLINE' ? 'Online Pay' : 'At Counter'}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge
-                        className={`text-[10px] font-semibold uppercase ${
+                        className={`text-[10px] font-semibold uppercase tracking-wider ${
                           order.status === 'NEW'
                             ? 'bg-amber-500 text-white'
                             : order.status === 'ACCEPTED'
@@ -239,8 +260,10 @@ export default function RestaurantAdminOrders() {
                             : order.status === 'PREPARING'
                             ? 'bg-purple-600 text-white'
                             : order.status === 'READY'
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-muted text-muted-foreground'
+                            ? 'bg-emerald-600 text-white animate-pulse'
+                            : order.status === 'COMPLETED'
+                            ? 'bg-stone-200 text-stone-700 dark:bg-stone-800 dark:text-stone-300'
+                            : 'bg-rose-500 text-white'
                         }`}
                       >
                         {order.status}
@@ -314,12 +337,25 @@ export default function RestaurantAdminOrders() {
               </div>
               <div>
                 <span className="text-muted-foreground">Payment:</span>
-                <p className="font-semibold text-foreground">
-                  {selectedOrder.paymentMethod} ({selectedOrder.paymentStatus})
-                </p>
-                <p className="text-muted-foreground">
-                  Total: {currentRestaurant.currency}
-                  {selectedOrder.total.toFixed(2)}
+                <div className="mt-1">
+                  <Badge
+                    variant="outline"
+                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                      selectedOrder.paymentStatus === 'PAID'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800'
+                        : selectedOrder.paymentStatus === 'FAILED'
+                        ? 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800'
+                        : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
+                    }`}
+                  >
+                    {selectedOrder.paymentStatus === 'PAID' ? '✓ Paid' : selectedOrder.paymentStatus === 'FAILED' ? '✗ Failed' : '⏳ Pending'}
+                    <span className="text-[10px] font-normal opacity-75 ml-1">
+                      ({selectedOrder.paymentMethod === 'ONLINE' ? 'Online' : 'Counter'})
+                    </span>
+                  </Badge>
+                </div>
+                <p className="text-muted-foreground mt-1">
+                  Total: <strong className="text-foreground">{currentRestaurant.currency}{selectedOrder.total.toFixed(2)}</strong>
                 </p>
               </div>
             </div>

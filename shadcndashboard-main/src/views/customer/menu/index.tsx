@@ -159,6 +159,26 @@ export default function CustomerMenuPage() {
     return Number((base * itemQuantity).toFixed(2));
   };
 
+  const handleQuickAdd = (item: MenuItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!item.isAvailable) {
+      toast.error('Sorry, this item is currently sold out.');
+      return;
+    }
+    const orderItem: OrderItem = {
+      id: `ci-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      menuItemId: item.id,
+      name: item.name,
+      price: item.price,
+      quantity: 1,
+      imageUrl: item.imageUrl,
+      selectedCustomizations: [],
+      itemTotal: item.price,
+    };
+    addToCart(orderItem);
+    toast.success(`Added 1x ${item.name} to cart`);
+  };
+
   const handleConfirmAddToCart = () => {
     if (!activeItem) return;
 
@@ -246,8 +266,12 @@ export default function CustomerMenuPage() {
       })
       .catch((err) => {
         setIsOtpSending(false);
+        if (err.status && err.status !== 0) {
+          toast.error(err.message || 'Failed to request verification code.');
+          return;
+        }
         setCheckoutStep('OTP');
-        toast.info(err.message || 'Offline/Mock mode: enter 123456 to continue.');
+        toast.info(err.message || 'Offline preview mode: enter code to continue.');
       });
   };
 
@@ -269,8 +293,11 @@ export default function CustomerMenuPage() {
       })
       .catch((err) => {
         setIsSubmitting(false);
-        // Fallback for offline demo
-        toast.success('Email verified successfully!');
+        if (err.status && err.status !== 0) {
+          toast.error(err.message || 'Verification failed. Please check the code.');
+          return;
+        }
+        toast.warning('Backend unreachable. Continuing in offline preview mode.');
         setCheckoutStep('PAYMENT');
       });
   };
@@ -305,12 +332,16 @@ export default function CustomerMenuPage() {
         })),
       });
 
-      const serverOrder = response.order;
+      const serverOrder = response?.order || response;
       setIsSubmitting(false);
       setIsCheckoutOpen(false);
       setIsCartOpen(false);
       clearCart();
-      toast.success(`Order ${serverOrder.orderNumber} confirmed by kitchen!`);
+      if (response?.isDuplicate) {
+        toast.info(`Order ${serverOrder.orderNumber} already received! Opening tracking...`);
+      } else {
+        toast.success(`Order ${serverOrder.orderNumber} confirmed by kitchen!`);
+      }
       navigate(`/m/${currentRestaurant.slug}/${table || 'table-4'}/track/${serverOrder.id}`);
     } catch (err: any) {
       console.warn('Backend order placement error, evaluating fallback:', err);
@@ -341,7 +372,7 @@ export default function CustomerMenuPage() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 pb-28">
+    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 pb-28 overflow-x-hidden">
       {/* Mobile-Friendly Shell Container */}
       <div className="max-w-xl mx-auto bg-background min-h-screen border-x border-border shadow-sm flex flex-col">
         {/* Restaurant Header Banner */}
@@ -458,89 +489,116 @@ export default function CustomerMenuPage() {
               </Button>
             </div>
           ) : (
-            filteredItems.map((item) => (
-              <Card
-                key={item.id}
-                onClick={() => handleOpenCustomize(item)}
-                className={`overflow-hidden border border-border/80 transition-all duration-150 cursor-pointer hover:border-amber-500/50 hover:shadow-md flex flex-row ${
-                  !item.isAvailable ? 'opacity-65 cursor-not-allowed bg-muted/30' : 'bg-card'
-                }`}
-              >
-                {/* Content */}
-                <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                      {item.isVeg ? (
-                        <span className="size-3.5 rounded-xs border border-emerald-600 flex items-center justify-center p-0.5">
-                          <span className="size-1.5 rounded-full bg-emerald-600" />
-                        </span>
-                      ) : (
-                        <span className="size-3.5 rounded-xs border border-rose-600 flex items-center justify-center p-0.5">
-                          <span className="size-1.5 rounded-full bg-rose-600" />
-                        </span>
-                      )}
-                      <h3 className="font-bold text-sm sm:text-base text-foreground leading-tight">{item.name}</h3>
+            filteredItems.map((item) => {
+              const hasCustomizations = Boolean(item.customizationGroups && item.customizationGroups.length > 0);
+              const inCartQty = cart
+                .filter((c) => c.menuItemId === item.id)
+                .reduce((acc, c) => acc + c.quantity, 0);
+
+              return (
+                <Card
+                  key={item.id}
+                  onClick={() => handleOpenCustomize(item)}
+                  className={`overflow-hidden border border-border/80 transition-all duration-150 cursor-pointer hover:border-amber-500/50 hover:shadow-md flex flex-row ${
+                    !item.isAvailable ? 'opacity-65 cursor-not-allowed bg-muted/30' : 'bg-card'
+                  }`}
+                >
+                  {/* Content */}
+                  <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                        {item.isVeg ? (
+                          <span className="size-3.5 rounded-xs border border-emerald-600 flex items-center justify-center p-0.5" title="Vegetarian">
+                            <span className="size-1.5 rounded-full bg-emerald-600" />
+                          </span>
+                        ) : (
+                          <span className="size-3.5 rounded-xs border border-rose-600 flex items-center justify-center p-0.5" title="Non-Vegetarian">
+                            <span className="size-1.5 rounded-full bg-rose-600" />
+                          </span>
+                        )}
+                        <h3 className="font-bold text-sm sm:text-base text-foreground leading-tight">{item.name}</h3>
+                        {inCartQty > 0 && (
+                          <Badge variant="secondary" className="text-[10px] font-bold bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 py-0 px-1.5">
+                            {inCartQty} in cart
+                          </Badge>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{item.description}</p>
                     </div>
 
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{item.description}</p>
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-sm font-black text-foreground">
+                        {currentRestaurant.currency}
+                        {item.price.toFixed(2)}
+                      </span>
+
+                      {item.isAvailable ? (
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            if (hasCustomizations) {
+                              e.stopPropagation();
+                              handleOpenCustomize(item);
+                            } else {
+                              handleQuickAdd(item, e);
+                            }
+                          }}
+                          aria-label={`Add ${item.name} to order`}
+                          className="h-8 px-3 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-700 text-white gap-1 active:scale-95 transition-all shadow-xs"
+                        >
+                          <Plus className="size-3.5" />
+                          <span>{hasCustomizations ? 'Customize' : inCartQty > 0 ? 'Add +' : 'Add'}</span>
+                        </Button>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground border-border uppercase">
+                          Sold Out
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex items-center justify-between mt-3">
-                    <span className="text-sm font-black text-foreground">
-                      {currentRestaurant.currency}
-                      {item.price.toFixed(2)}
-                    </span>
-
-                    {item.isAvailable ? (
-                      <Button
-                        size="sm"
-                        className="h-7 px-3 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-700 text-white gap-1"
-                      >
-                        <Plus className="size-3.5" />
-                        <span>Add</span>
-                      </Button>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] text-muted-foreground border-border uppercase">
+                  {/* Thumbnail */}
+                  <div className="w-28 sm:w-32 h-28 sm:h-32 relative shrink-0 overflow-hidden bg-muted">
+                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                    {!item.isAvailable && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[11px] font-bold text-white uppercase tracking-wider">
                         Sold Out
-                      </Badge>
+                      </div>
                     )}
                   </div>
-                </div>
-
-                {/* Thumbnail */}
-                <div className="w-28 sm:w-32 h-28 sm:h-32 relative shrink-0 overflow-hidden bg-muted">
-                  <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                  {!item.isAvailable && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[11px] font-bold text-white uppercase tracking-wider">
-                      Sold Out
-                    </div>
-                  )}
-                </div>
-              </Card>
-            ))
+                </Card>
+              );
+            })
           )}
         </div>
       </div>
 
       {/* Floating Bottom Cart Bar (Appears when cart has items) */}
       {cartItemCount > 0 && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-40 animate-in slide-in-from-bottom-2">
+        <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-lg z-40 animate-in slide-in-from-bottom-2 duration-200">
           <Button
             onClick={() => setIsCartOpen(true)}
-            className="w-full h-13 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl shadow-xl flex items-center justify-between px-5 text-sm"
+            aria-label={`View Cart with ${cartItemCount} items, total ${currentRestaurant.currency}${cartTotal.toFixed(2)}`}
+            className="w-full h-14 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl shadow-xl flex items-center justify-between px-5 text-sm active:scale-[0.99] transition-all border border-amber-500/30"
           >
-            <div className="flex items-center gap-2">
-              <span className="size-6 rounded-full bg-black/20 flex items-center justify-center text-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="size-7 rounded-full bg-black/25 flex items-center justify-center text-xs font-black">
                 {cartItemCount}
               </span>
-              <span>View Cart</span>
+              <div className="text-left">
+                <span className="block leading-tight font-bold">View Cart</span>
+                <span className="text-[10px] font-normal text-amber-100 opacity-90 block">
+                  {cartItemCount === 1 ? '1 dish queued' : `${cartItemCount} dishes queued`}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              <span>
+              <span className="text-base font-black">
                 {currentRestaurant.currency}
                 {cartTotal.toFixed(2)}
               </span>
-              <ArrowRight className="size-4" />
+              <ArrowRight className="size-4.5" />
             </div>
           </Button>
         </div>

@@ -173,6 +173,35 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
 
     const table = tableVerification.table;
 
+    // Duplicate submission guard: prevent duplicate orders if an identical submission occurs within 5 seconds
+    const fiveSecondsAgo = new Date(Date.now() - 5000);
+    const existingRecentOrder = await prisma.order.findFirst({
+      where: {
+        restaurantId: restaurant.id,
+        tableId: table.id,
+        customerEmail: input.customerEmail.toLowerCase().trim(),
+        createdAt: { gte: fiveSecondsAgo },
+      },
+      include: {
+        items: { include: { customizations: true } },
+        table: true,
+        restaurant: { select: { id: true, name: true, slug: true, currency: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existingRecentOrder) {
+      res.status(200).json({
+        success: true,
+        message: 'Order already received',
+        data: {
+          order: existingRecentOrder,
+          isDuplicate: true,
+        },
+      });
+      return;
+    }
+
     // Fetch and validate all menu items server-side (NEVER trust client price)
     const itemIds = input.items.map((i) => i.menuItemId);
     const dbMenuItems = await prisma.menuItem.findMany({

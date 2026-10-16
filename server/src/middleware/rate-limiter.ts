@@ -85,3 +85,16 @@ export const otpVerifyLimiter = createRateLimiter({
   },
   message: 'Maximum verification attempts exceeded. Please request a new verification code.',
 });
+
+// Specialized Auth login limiter: max 10 failed attempts per 15 minutes per email/IP
+export const loginLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 10,
+  keyGenerator: (req) => {
+    const email = req.body?.email ? String(req.body.email).toLowerCase().trim() : 'no-email';
+    const ip = req.ip || req.socket.remoteAddress || 'no-ip';
+    return `login_${email}_${ip}`;
+  },
+  message: 'Too many login attempts. Please wait 15 minutes before trying again.',
+});
+

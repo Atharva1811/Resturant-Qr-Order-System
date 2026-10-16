@@ -161,7 +161,7 @@ export default function CustomerOrderTrackingPage() {
   const currentStepIdx = getStepIndex(order.status);
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 pb-20">
+    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 pb-20 overflow-x-hidden">
       <div className="max-w-xl mx-auto bg-background min-h-screen border-x border-border shadow-sm flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-border bg-card flex items-center justify-between">
@@ -256,10 +256,22 @@ export default function CustomerOrderTrackingPage() {
 
         {/* Order Details & Receipt */}
         <div className="p-6 space-y-4 flex-1">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-sm font-bold text-foreground">Order Summary</h3>
-            <Badge variant="outline" className="text-xs">
-              {order.paymentMethod === 'ONLINE' ? 'Paid Online' : 'Pay at Counter'}
+            <Badge
+              variant="outline"
+              className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                order.paymentStatus === 'PAID'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800'
+                  : order.paymentStatus === 'FAILED'
+                  ? 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800'
+                  : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
+              }`}
+            >
+              {order.paymentStatus === 'PAID' ? '✓ Paid' : order.paymentStatus === 'FAILED' ? '✗ Payment Failed' : '⏳ Settle at Counter'}
+              <span className="text-[10px] font-normal opacity-80 ml-1">
+                ({order.paymentMethod === 'ONLINE' ? 'Online' : 'Cash/Card'})
+              </span>
             </Badge>
           </div>
 

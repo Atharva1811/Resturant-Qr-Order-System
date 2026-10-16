@@ -33,8 +33,10 @@ export const initiatePayment = async (req: Request, res: Response, next: NextFun
 
 export const handleWebhook = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { provider } = req.params;
-    const signature = req.headers['x-payment-signature'] as string;
+    const provider = req.params.provider || req.body?.provider || 'MOCK_ONLINE_GATEWAY';
+    const signature = (req.headers['x-payment-signature'] ||
+      req.headers['x-webhook-signature'] ||
+      req.headers['x-razorpay-signature']) as string;
     const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 

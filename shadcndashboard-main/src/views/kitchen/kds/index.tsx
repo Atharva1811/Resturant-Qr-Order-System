@@ -242,7 +242,7 @@ export default function KitchenDashboard() {
             return (
               <Card
                 key={order.id}
-                className={`flex flex-col transition-all duration-200 shadow-sm hover:shadow-md ${
+                className={`flex flex-col transition-all duration-200 shadow-sm hover:shadow-md overflow-hidden ${
                   isOverdue
                     ? 'border-rose-400 bg-rose-50/20 dark:bg-rose-950/10'
                     : order.status === 'NEW'
@@ -250,6 +250,19 @@ export default function KitchenDashboard() {
                     : 'border-border bg-card'
                 }`}
               >
+                {/* Urgent Overdue Ticket Banner */}
+                {isOverdue && (
+                  <div className="bg-rose-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-between tracking-wide animate-pulse">
+                    <span className="flex items-center gap-1.5">
+                      <AlertTriangle className="size-4 shrink-0" />
+                      <span>URGENT: WAITING OVER {elapsed} MINUTES</span>
+                    </span>
+                    <span className="text-[10px] uppercase font-mono bg-rose-800/90 px-2 py-0.5 rounded shadow-xs">
+                      PRIORITY
+                    </span>
+                  </div>
+                )}
+
                 {/* Header */}
                 <CardHeader className="pb-3 border-b border-border/80">
                   <div className="flex items-start justify-between gap-2">
@@ -285,7 +298,7 @@ export default function KitchenDashboard() {
                       <div
                         className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md ${
                           isOverdue
-                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold animate-pulse'
+                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold'
                             : 'bg-muted text-muted-foreground'
                         }`}
                       >
@@ -304,8 +317,8 @@ export default function KitchenDashboard() {
                     {order.items.map((item) => (
                       <div key={item.id} className="py-2.5 first:pt-0 last:pb-0">
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-start gap-2.5">
-                            <span className="size-6 rounded-md bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                          <div className="flex items-start gap-3">
+                            <span className="size-8 rounded-lg bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 flex items-center justify-center font-black text-sm shrink-0 mt-0.5 shadow-xs">
                               {item.quantity}x
                             </span>
                             <div>
@@ -344,17 +357,31 @@ export default function KitchenDashboard() {
                 </CardContent>
 
                 {/* Card Action Footer */}
-                <CardFooter className="pt-3 border-t border-border flex items-center justify-between gap-2 bg-muted/20">
-                  <span className="text-xs text-muted-foreground font-medium">
-                    Payment: {order.paymentMethod} ({order.paymentStatus})
-                  </span>
+                <CardFooter className="pt-3 pb-3 border-t border-border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-muted/20">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Payment:</span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                        order.paymentStatus === 'PAID'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800'
+                          : order.paymentStatus === 'FAILED'
+                          ? 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800'
+                          : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
+                      }`}
+                    >
+                      {order.paymentStatus === 'PAID' ? '✓ Paid' : order.paymentStatus === 'FAILED' ? '✗ Failed' : '⏳ Pending'}
+                      <span className="text-[10px] font-normal opacity-75 ml-1">
+                        ({order.paymentMethod === 'ONLINE' ? 'Online' : 'Counter'})
+                      </span>
+                    </Badge>
+                  </div>
 
                   {order.status !== 'COMPLETED' ? (
                     <Button
                       onClick={() => handleNextStatus(order)}
                       disabled={updatingOrderId === order.id}
-                      size="sm"
-                      className={`text-xs font-semibold rounded-lg gap-1.5 shadow-sm transition-all ${
+                      className={`w-full sm:w-auto min-h-[44px] h-11 text-xs sm:text-sm font-bold rounded-xl gap-2 shadow-sm transition-all active:scale-[0.98] ${
                         order.status === 'NEW'
                           ? 'bg-amber-600 hover:bg-amber-700 text-white'
                           : order.status === 'ACCEPTED'
@@ -366,7 +393,7 @@ export default function KitchenDashboard() {
                     >
                       {updatingOrderId === order.id ? (
                         <>
-                          <RefreshCw className="size-3.5 animate-spin" />
+                          <RefreshCw className="size-4 animate-spin" />
                           <span>Updating...</span>
                         </>
                       ) : (
@@ -375,13 +402,13 @@ export default function KitchenDashboard() {
                           {order.status === 'ACCEPTED' && 'Start Cooking'}
                           {order.status === 'PREPARING' && 'Mark as Ready'}
                           {order.status === 'READY' && 'Complete Order'}
-                          <ArrowRight className="size-3.5" />
+                          <ArrowRight className="size-4" />
                         </>
                       )}
                     </Button>
                   ) : (
-                    <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-300 bg-emerald-50">
-                      Completed
+                    <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 font-bold py-1 px-2.5">
+                      Completed & Served
                     </Badge>
                   )}
                 </CardFooter>
