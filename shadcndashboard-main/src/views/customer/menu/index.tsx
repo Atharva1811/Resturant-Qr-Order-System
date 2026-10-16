@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router';
 import api from 'src/api/api-client';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import { MenuItem, CustomizationGroup, SelectedCustomization, OrderItem } from 'src/context/restaurant-context/types';
@@ -53,7 +53,32 @@ export default function CustomerMenuPage() {
     createCustomerOrder,
   } = useRestaurant();
 
+  const [searchParams] = useSearchParams();
+  const qrToken = searchParams.get('token') || undefined;
   const formattedTable = table ? decodeURIComponent(table).replace(/-/g, ' ').toUpperCase() : 'TABLE 4';
+
+  const [tableVerified, setTableVerified] = useState<boolean | null>(null);
+  const [tableError, setTableError] = useState<string | null>(null);
+
+  // Validate table QR context on server
+  useEffect(() => {
+    if (currentRestaurant?.slug && formattedTable) {
+      api.public
+        .verifyTable(currentRestaurant.slug, formattedTable, qrToken)
+        .then(() => {
+          setTableVerified(true);
+          setTableError(null);
+        })
+        .catch((err) => {
+          if (err.status === 400 || err.status === 404) {
+            setTableVerified(false);
+            setTableError(err.message || 'Table verification failed. Please scan the official table stand.');
+          } else {
+            setTableVerified(true);
+          }
+        });
+    }
+  }, [currentRestaurant?.slug, formattedTable, qrToken]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
@@ -250,33 +275,69 @@ export default function CustomerMenuPage() {
       });
   };
 
-  const handleSubmitFinalOrder = () => {
+  const handleSubmitFinalOrder = async () => {
     if (cart.length === 0) {
       toast.error('Your cart is empty.');
       return;
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const order = createCustomerOrder({
+    try {
+      const sessionToken = localStorage.getItem('sudarshan_customer_session') || undefined;
+
+      const response = await api.public.createOrder({
         restaurantSlug: currentRestaurant.slug,
         tableNumber: formattedTable,
+        tableToken: qrToken,
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim(),
-        items: cart,
-        subtotal: cartSubtotal,
-        tax: cartTax,
-        total: cartTotal,
+        sessionToken,
         paymentMethod: paymentMethod,
         notes: 'Placed via Mobile QR Scan',
+        items: cart.map((i) => ({
+          menuItemId: i.menuItemId,
+          quantity: i.quantity,
+          selectedCustomizations: i.selectedCustomizations?.map((c) => ({
+            groupId: c.groupId,
+            optionIds: c.selectedOptionIds,
+          })),
+          notes: i.notes,
+        })),
       });
 
+      const serverOrder = response.order;
       setIsSubmitting(false);
       setIsCheckoutOpen(false);
       setIsCartOpen(false);
-      toast.success(`Order ${order.orderNumber} placed successfully!`);
-      navigate(`/m/${currentRestaurant.slug}/${table || 'table-4'}/track/${order.id}`);
-    }, 800);
+      clearCart();
+      toast.success(`Order ${serverOrder.orderNumber} confirmed by kitchen!`);
+      navigate(`/m/${currentRestaurant.slug}/${table || 'table-4'}/track/${serverOrder.id}`);
+    } catch (err: any) {
+      console.warn('Backend order placement error, evaluating fallback:', err);
+      // Fallback if backend network is unreachable during offline testing
+      if (!err.status || err.status === 0) {
+        const order = createCustomerOrder({
+          restaurantSlug: currentRestaurant.slug,
+          tableNumber: formattedTable,
+          customerName: customerName.trim(),
+          customerEmail: customerEmail.trim(),
+          items: cart,
+          subtotal: cartSubtotal,
+          tax: cartTax,
+          total: cartTotal,
+          paymentMethod: paymentMethod,
+          notes: 'Placed via Mobile QR Scan (Offline Store)',
+        });
+        setIsSubmitting(false);
+        setIsCheckoutOpen(false);
+        setIsCartOpen(false);
+        toast.success(`Order ${order.orderNumber} placed in offline store!`);
+        navigate(`/m/${currentRestaurant.slug}/${table || 'table-4'}/track/${order.id}`);
+      } else {
+        setIsSubmitting(false);
+        toast.error(err.message || 'Failed to place order. Please review your selections.');
+      }
+    }
   };
 
   return (

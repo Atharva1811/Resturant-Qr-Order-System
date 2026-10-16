@@ -74,3 +74,20 @@ export const onPaymentUpdated = (
     s.off('order:payment_updated', callback);
   };
 };
+
+export const onSocketConnect = (callback: () => void): (() => void) => {
+  const s = getSocket();
+  s.on('connect', callback);
+  return () => {
+    s.off('connect', callback);
+  };
+};
+
+export const onSocketDisconnect = (callback: (reason: string) => void): (() => void) => {
+  const s = getSocket();
+  s.on('disconnect', callback);
+  return () => {
+    s.off('disconnect', callback);
+  };
+};
+

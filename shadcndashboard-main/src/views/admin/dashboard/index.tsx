@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
+import api from 'src/api/api-client';
 import { Card, CardHeader, CardTitle, CardContent } from 'src/components/ui/card';
 import { Badge } from 'src/components/ui/badge';
 import { Button } from 'src/components/ui/button';
@@ -28,16 +29,27 @@ import {
 } from 'recharts';
 
 export default function RestaurantAdminDashboard() {
-  const { currentRestaurant, orders, menuItems, tables } = useRestaurant();
+  const { currentRestaurant, orders, menuItems, tables, isBackendConnected } = useRestaurant();
+  const [serverAnalytics, setServerAnalytics] = useState<any | null>(null);
 
   const restaurantOrders = orders.filter((o) => o.restaurantSlug === currentRestaurant.slug);
 
+  useEffect(() => {
+    api.admin
+      .getAnalytics()
+      .then((data) => {
+        if (data) setServerAnalytics(data);
+      })
+      .catch(() => {});
+  }, [currentRestaurant.id]);
+
   // Metrics calculations
-  const totalRevenue = restaurantOrders.reduce((acc, o) => acc + o.total, 0);
+  const totalRevenue = serverAnalytics?.totalRevenue ?? restaurantOrders.reduce((acc, o) => acc + o.total, 0);
+  const totalOrdersCount = serverAnalytics?.totalOrders ?? restaurantOrders.length;
   const pendingOrders = restaurantOrders.filter(
     (o) => o.status === 'NEW' || o.status === 'ACCEPTED' || o.status === 'PREPARING'
   ).length;
-  const aov = restaurantOrders.length > 0 ? totalRevenue / restaurantOrders.length : 0;
+  const aov = serverAnalytics?.averageOrderValue ?? (totalOrdersCount > 0 ? totalRevenue / totalOrdersCount : 0);
 
   // Chart data: hourly sales simulation
   const salesTrendData = [
@@ -63,18 +75,32 @@ export default function RestaurantAdminDashboard() {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Demo Disclosure Banner */}
-      <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
-        <div className="flex items-center gap-2">
-          <Sparkles className="size-4 text-amber-600 shrink-0" />
-          <span>
-            <strong>Demo Restaurant Admin:</strong> Connected to live mock store for <strong>{currentRestaurant.name}</strong>. Values reflect interactive demo data.
-          </span>
+      {/* Backend Status Banner */}
+      {isBackendConnected ? (
+        <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-xl p-3 flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-200">
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>
+              <strong>Live Backend Connected:</strong> PostgreSQL & Express sync active for <strong>{currentRestaurant.name}</strong>.
+            </span>
+          </div>
+          <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:text-emerald-300 text-[10px]">
+            Live Server Active
+          </Badge>
         </div>
-        <Badge variant="outline" className="border-amber-300 text-[10px]">
-          Demo Data
-        </Badge>
-      </div>
+      ) : (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>Resilient Local Mode:</strong> Connected to client store for <strong>{currentRestaurant.name}</strong>. Values update optimistically.
+            </span>
+          </div>
+          <Badge variant="outline" className="border-amber-300 text-[10px]">
+            Local Store
+          </Badge>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

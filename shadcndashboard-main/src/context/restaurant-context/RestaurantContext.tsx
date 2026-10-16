@@ -46,7 +46,7 @@ interface RestaurantContextType {
   cartItemCount: number;
 
   // Orders
-  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<boolean> | void;
   createCustomerOrder: (orderPayload: {
     restaurantSlug: string;
     tableNumber: string;
@@ -83,6 +83,10 @@ interface RestaurantContextType {
   // Superadmin
   updateRestaurantStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED') => void;
   addRestaurant: (restaurant: Omit<Restaurant, 'id' | 'createdAt' | 'totalOrders' | 'totalRevenue'>) => Restaurant;
+
+  // Backend Sync Status
+  isBackendConnected: boolean;
+  refreshData: () => Promise<void>;
 
   // Reset
   resetToInitialData: () => void;
@@ -204,6 +208,174 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const currentRestaurant =
     restaurants.find((r) => r.slug === currentRestaurantSlug) || restaurants[0];
 
+  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
+
+  // Synchronize restaurant catalog, tables, staff, and orders from backend
+  const refreshData = async () => {
+    try {
+      const res = await api.public.getRestaurant(currentRestaurantSlug);
+      if (res) {
+        setIsBackendConnected(true);
+        setRestaurants((prev) =>
+          prev.map((r) =>
+            r.slug === currentRestaurantSlug
+              ? {
+                  ...r,
+                  id: res.id,
+                  name: res.name,
+                  cuisine: res.cuisine,
+                  address: res.address,
+                  phone: res.phone,
+                  email: res.email,
+                  currency: res.currency,
+                  taxRate: res.taxRate,
+                }
+              : r
+          )
+        );
+
+        if (Array.isArray(res.categories) && res.categories.length > 0) {
+          setCategories(
+            res.categories.map((c: any) => ({
+              id: c.id,
+              restaurantSlug: currentRestaurantSlug,
+              name: c.name,
+              description: c.description,
+              sortOrder: c.sortOrder,
+              icon: c.icon,
+            }))
+          );
+        }
+
+        if (Array.isArray(res.menuItems) && res.menuItems.length > 0) {
+          setMenuItems(
+            res.menuItems.map((m: any) => ({
+              id: m.id,
+              restaurantSlug: currentRestaurantSlug,
+              categoryId: m.categoryId,
+              name: m.name,
+              description: m.description,
+              price: m.price,
+              imageUrl: m.imageUrl,
+              isAvailable: m.isAvailable,
+              isVeg: m.isVeg,
+              prepTimeMinutes: m.prepTimeMinutes,
+              customizationGroups: m.customizationGroups?.map((g: any) => ({
+                id: g.id,
+                name: g.name,
+                type: g.type,
+                required: g.required,
+                options: g.options?.map((o: any) => ({
+                  id: o.id,
+                  name: o.name,
+                  price: o.price,
+                  isAvailable: o.isAvailable,
+                })) || [],
+              })) || [],
+            }))
+          );
+        }
+      }
+
+      // Background sync for admin tables
+      api.admin
+        .getTables()
+        .then((tableRes) => {
+          if (Array.isArray(tableRes) && tableRes.length > 0) {
+            setTables(
+              tableRes.map((t: any) => ({
+                id: t.id,
+                restaurantSlug: currentRestaurantSlug,
+                tableNumber: t.tableNumber,
+                capacity: t.capacity,
+                status: t.status,
+                qrCodeUrl: t.qrCodeUrl,
+              }))
+            );
+          }
+        })
+        .catch(() => {});
+
+      // Background sync for staff
+      api.admin
+        .getStaff()
+        .then((staffRes) => {
+          if (Array.isArray(staffRes) && staffRes.length > 0) {
+            setStaff(
+              staffRes.map((s: any) => ({
+                id: s.id,
+                restaurantSlug: currentRestaurantSlug,
+                name: s.name,
+                email: s.email,
+                role: s.role,
+                status: s.status,
+                avatarUrl: s.avatarUrl,
+                joinedDate: s.joinedDate ? new Date(s.joinedDate).toISOString().split('T')[0] : '2026-01-01',
+              }))
+            );
+          }
+        })
+        .catch(() => {});
+
+      // Background sync for kitchen active orders
+      api.kitchen
+        .getActiveOrders()
+        .then((kitchenOrders) => {
+          if (Array.isArray(kitchenOrders) && kitchenOrders.length > 0) {
+            setOrders((prev) => {
+              const updated = [...prev];
+              for (const ko of kitchenOrders) {
+                const idx = updated.findIndex((o) => o.id === ko.id || o.orderNumber === ko.orderNumber);
+                const mapped: Order = {
+                  id: ko.id,
+                  orderNumber: ko.orderNumber,
+                  restaurantSlug: currentRestaurantSlug,
+                  tableNumber: ko.table?.tableNumber || ko.tableNumberSnapshot || 'Table',
+                  customerName: ko.customerName,
+                  customerEmail: ko.customerEmail,
+                  items: ko.items?.map((item: any) => ({
+                    id: item.id,
+                    menuItemId: item.menuItemId,
+                    name: item.nameSnapshot || item.name,
+                    quantity: item.quantity,
+                    price: item.priceSnapshot || item.price,
+                    itemTotal: item.itemTotal,
+                    selectedCustomizations: item.customizations?.map((c: any) => ({
+                      groupId: c.id,
+                      groupName: c.groupNameSnapshot || 'Customization',
+                      selectedOptionNames: [c.optionNameSnapshot || c.name || ''],
+                    })) || [],
+                    notes: item.notes,
+                  })) || [],
+                  subtotal: ko.subtotal,
+                  tax: ko.tax,
+                  total: ko.total,
+                  paymentMethod: ko.paymentMethod || 'COUNTER',
+                  paymentStatus: ko.paymentStatus || 'PENDING',
+                  status: ko.status,
+                  createdAt: ko.createdAt,
+                  notes: ko.notes,
+                };
+                if (idx >= 0) {
+                  updated[idx] = mapped;
+                } else {
+                  updated.unshift(mapped);
+                }
+              }
+              return updated;
+            });
+          }
+        })
+        .catch(() => {});
+    } catch {
+      setIsBackendConnected(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
+  }, [currentRestaurantSlug]);
+
   // Socket.IO real-time event listener for live order sync
   useEffect(() => {
     try {
@@ -314,7 +486,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const clearCart = () => setCart([]);
 
   // Orders
-  const updateOrderStatus = (orderId: string, status: OrderStatus) => {
+  const updateOrderStatus = async (orderId: string, status: OrderStatus): Promise<boolean> => {
     // Optimistic local update
     setOrders((prev) =>
       prev.map((ord) => {
@@ -330,9 +502,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
 
     // Sync with backend API
-    api.kitchen.updateOrderStatus(orderId, status).catch(() => {
-      // Backend may be offline or mock mode
-    });
+    try {
+      await api.kitchen.updateOrderStatus(orderId, status);
+      return true;
+    } catch {
+      // Backend may be offline or in mock mode
+      return false;
+    }
   };
 
   const createCustomerOrder = (payload: {
@@ -422,81 +598,160 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Menu items
   const addMenuItem = (item: Omit<MenuItem, 'id'>): MenuItem => {
+    const tempId = `item-${Date.now()}`;
     const newItem: MenuItem = {
       ...item,
-      id: `item-${Date.now()}`,
+      id: tempId,
     };
     setMenuItems((prev) => [newItem, ...prev]);
+
+    api.admin
+      .createMenuItem({
+        name: item.name,
+        description: item.description,
+        price: item.price,
+        categoryId: item.categoryId,
+        imageUrl: item.imageUrl,
+        isAvailable: item.isAvailable,
+        isVeg: item.isVeg,
+        prepTimeMinutes: item.prepTimeMinutes,
+        customizationGroups: item.customizationGroups,
+      })
+      .then((res) => {
+        if (res?.data?.id || res?.id) {
+          const realId = res?.data?.id || res?.id;
+          setMenuItems((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: realId } : m)));
+        }
+      })
+      .catch(() => {});
+
     return newItem;
   };
 
   const updateMenuItem = (id: string, updates: Partial<MenuItem>) => {
     setMenuItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
+    api.admin.updateMenuItem(id, updates).catch(() => {});
   };
 
   const deleteMenuItem = (id: string) => {
     setMenuItems((prev) => prev.filter((item) => item.id !== id));
+    api.admin.deleteMenuItem(id).catch(() => {});
   };
 
   const toggleItemAvailability = (id: string) => {
     setMenuItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, isAvailable: !item.isAvailable } : item))
     );
+    api.admin.toggleItemAvailability(id).catch(() => {});
   };
 
   // Categories
   const addCategory = (category: Omit<MenuCategory, 'id'>): MenuCategory => {
+    const tempId = `cat-${Date.now()}`;
     const newCat: MenuCategory = {
       ...category,
-      id: `cat-${Date.now()}`,
+      id: tempId,
     };
     setCategories((prev) => [...prev, newCat]);
+
+    api.admin
+      .createCategory({
+        name: category.name,
+        description: category.description,
+        sortOrder: category.sortOrder,
+      })
+      .then((res) => {
+        if (res?.data?.id || res?.id) {
+          const realId = res?.data?.id || res?.id;
+          setCategories((prev) => prev.map((c) => (c.id === tempId ? { ...c, id: realId } : c)));
+        }
+      })
+      .catch(() => {});
+
     return newCat;
   };
 
   const updateCategory = (id: string, updates: Partial<MenuCategory>) => {
     setCategories((prev) => prev.map((cat) => (cat.id === id ? { ...cat, ...updates } : cat)));
+    api.admin.updateCategory(id, updates).catch(() => {});
   };
 
   const deleteCategory = (id: string) => {
     setCategories((prev) => prev.filter((cat) => cat.id !== id));
+    api.admin.deleteCategory(id).catch(() => {});
   };
 
   // Tables
   const addTable = (table: Omit<TableItem, 'id'>): TableItem => {
+    const tempId = `tbl-${Date.now()}`;
     const newTable: TableItem = {
       ...table,
-      id: `tbl-${Date.now()}`,
+      id: tempId,
     };
     setTables((prev) => [...prev, newTable]);
+
+    api.admin
+      .createTable({
+        tableNumber: table.tableNumber,
+        capacity: table.capacity,
+        status: table.status,
+      })
+      .then((res) => {
+        if (res?.data?.id || res?.id) {
+          const realId = res?.data?.id || res?.id;
+          setTables((prev) => prev.map((t) => (t.id === tempId ? { ...t, id: realId } : t)));
+        }
+      })
+      .catch(() => {});
+
     return newTable;
   };
 
   const updateTable = (id: string, updates: Partial<TableItem>) => {
     setTables((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+    api.admin.updateTable(id, updates).catch(() => {});
   };
 
   const deleteTable = (id: string) => {
     setTables((prev) => prev.filter((t) => t.id !== id));
+    api.admin.deleteTable(id).catch(() => {});
   };
 
   // Staff
   const addStaff = (member: Omit<StaffMember, 'id' | 'joinedDate'>): StaffMember => {
+    const tempId = `staff-${Date.now()}`;
     const newStaff: StaffMember = {
       ...member,
-      id: `staff-${Date.now()}`,
+      id: tempId,
       joinedDate: new Date().toISOString().split('T')[0],
     };
     setStaff((prev) => [...prev, newStaff]);
+
+    api.admin
+      .createStaff({
+        email: member.email,
+        name: member.name,
+        role: member.role,
+      })
+      .then((res) => {
+        if (res?.data?.id || res?.id) {
+          const realId = res?.data?.id || res?.id;
+          setStaff((prev) => prev.map((s) => (s.id === tempId ? { ...s, id: realId } : s)));
+        }
+      })
+      .catch(() => {});
+
     return newStaff;
   };
 
   const updateStaff = (id: string, updates: Partial<StaffMember>) => {
     setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
+    api.admin.updateStaff(id, updates).catch(() => {});
   };
 
   const deleteStaff = (id: string) => {
     setStaff((prev) => prev.filter((s) => s.id !== id));
+    api.admin.deleteStaff(id).catch(() => {});
   };
 
   // Settings
@@ -504,24 +759,47 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setRestaurants((prev) =>
       prev.map((r) => (r.slug === currentRestaurantSlug ? { ...r, ...updates } : r))
     );
+    api.admin.updateSettings(updates).catch(() => {});
   };
 
   // Superadmin
   const updateRestaurantStatus = (id: string, status: 'ACTIVE' | 'SUSPENDED') => {
     setRestaurants((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+    api.superadmin.updateTenantStatus(id, status).catch(() => {});
   };
 
   const addRestaurant = (
     restaurant: Omit<Restaurant, 'id' | 'createdAt' | 'totalOrders' | 'totalRevenue'>
   ): Restaurant => {
+    const tempId = `rest-${Date.now()}`;
     const newRest: Restaurant = {
       ...restaurant,
-      id: `rest-${Date.now()}`,
+      id: tempId,
       createdAt: new Date().toISOString(),
       totalOrders: 0,
       totalRevenue: 0,
     };
     setRestaurants((prev) => [newRest, ...prev]);
+
+    api.superadmin
+      .createTenant({
+        name: restaurant.name,
+        slug: restaurant.slug,
+        cuisine: restaurant.cuisine,
+        address: restaurant.address,
+        phone: restaurant.phone,
+        email: restaurant.email,
+        currency: restaurant.currency,
+        taxRate: restaurant.taxRate,
+      })
+      .then((res) => {
+        if (res?.data?.id || res?.id) {
+          const realId = res?.data?.id || res?.id;
+          setRestaurants((prev) => prev.map((r) => (r.id === tempId ? { ...r, id: realId } : r)));
+        }
+      })
+      .catch(() => {});
+
     return newRest;
   };
 
@@ -582,6 +860,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateRestaurantSettings,
         updateRestaurantStatus,
         addRestaurant,
+        isBackendConnected,
+        refreshData,
         resetToInitialData,
       }}
     >

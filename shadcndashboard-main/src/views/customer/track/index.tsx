@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
+import api from 'src/api/api-client';
 import { joinOrderRoom, onOrderStatusUpdated } from 'src/api/socket-client';
 import { Card, CardHeader, CardContent } from 'src/components/ui/card';
 import { Badge } from 'src/components/ui/badge';
@@ -16,6 +17,8 @@ import {
   Sparkles,
   ShoppingBag,
   CircleCheck,
+  RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 
 export default function CustomerOrderTrackingPage() {
@@ -23,12 +26,41 @@ export default function CustomerOrderTrackingPage() {
   const { orders, currentRestaurant } = useRestaurant();
   const [pulseKey, setPulseKey] = useState(0);
 
-  const order = orders.find((o) => o.id === orderId) || orders[0];
+  const [serverOrder, setServerOrder] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const fetchOrder = async () => {
+    if (!orderId) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      const res = await api.public.trackOrder(orderId);
+      if (res) {
+        setServerOrder(res);
+      }
+    } catch (err: any) {
+      // If server tracking fails, fallback to local context order if available
+      const local = orders.find((o) => o.id === orderId || o.orderNumber === orderId);
+      if (!local) {
+        setFetchError(err.message || 'Unable to locate order on server.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Flash animation on status change
+    fetchOrder();
+  }, [orderId]);
+
+  // Flash animation on status change
+  useEffect(() => {
     setPulseKey((prev) => prev + 1);
-  }, [order?.status]);
+  }, [serverOrder?.status]);
 
   // Real-time Socket.IO room subscription for live tracking
   useEffect(() => {
@@ -40,7 +72,8 @@ export default function CustomerOrderTrackingPage() {
     }
 
     const unsub = onOrderStatusUpdated((data) => {
-      if (data?.orderId === orderId) {
+      if (data?.orderId === orderId || data?.order?.orderNumber === orderId) {
+        setServerOrder((prev: any) => (prev ? { ...prev, status: data.status } : prev));
         setPulseKey((prev) => prev + 1);
       }
     });
@@ -48,18 +81,57 @@ export default function CustomerOrderTrackingPage() {
     return () => unsub();
   }, [orderId]);
 
-  if (!order) {
+  const effectiveOrder = serverOrder || orders.find((o) => o.id === orderId) || (orders.length > 0 ? orders[0] : null);
+
+  if (isLoading && !effectiveOrder) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="font-bold text-base text-foreground">Order not found</p>
-          <Link to={`/m/${slug || 'rustic-hearth'}/${table || 'table-4'}`}>
-            <Button className="mt-4">Return to Menu</Button>
-          </Link>
+      <div className="min-h-screen flex items-center justify-center p-4 bg-stone-50 dark:bg-stone-950">
+        <div className="text-center space-y-3">
+          <RefreshCw className="size-8 animate-spin text-amber-600 mx-auto" />
+          <p className="font-semibold text-sm text-foreground">Loading your order status...</p>
+          <p className="text-xs text-muted-foreground">Connecting to kitchen queue</p>
         </div>
       </div>
     );
   }
+
+  if (!effectiveOrder) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-stone-50 dark:bg-stone-950">
+        <div className="text-center max-w-sm bg-card border border-border p-6 rounded-2xl shadow-sm space-y-4">
+          <AlertCircle className="size-10 text-rose-500 mx-auto" />
+          <div>
+            <p className="font-bold text-base text-foreground">Order Not Found</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {fetchError || `We couldn't find an order matching "${orderId}". It may have expired or belongs to a different table.`}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button
+              onClick={fetchOrder}
+              disabled={isLoading}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <RefreshCw className={`size-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Retry Search</span>
+            </Button>
+            <Link to={`/m/${slug || 'rustic-hearth'}/${table || 'table-4'}`}>
+              <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700 text-white">
+                Return to Menu
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const order = effectiveOrder;
+  const tableDisplay = order.table?.tableNumber || order.tableNumberSnapshot || order.tableNumber || table || 'Table';
+  const restaurantSlugDisplay = order.restaurant?.slug || order.restaurantSlug || slug || 'rustic-hearth';
+  const currencyDisplay = order.restaurant?.currency || currentRestaurant.currency || '$';
 
   const steps = [
     { key: 'NEW', title: 'Order Received', desc: 'Sent to the kitchen system' },
@@ -94,14 +166,14 @@ export default function CustomerOrderTrackingPage() {
         {/* Header */}
         <div className="p-4 border-b border-border bg-card flex items-center justify-between">
           <Link
-            to={`/m/${order.restaurantSlug}/${table || 'table-4'}`}
+            to={`/m/${restaurantSlugDisplay}/${table || 'table-4'}`}
             className="text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1.5"
           >
             <ArrowLeft className="size-4" />
             <span>Order More Food</span>
           </Link>
           <Badge className="bg-amber-600 hover:bg-amber-600 text-white font-bold text-xs py-0.5">
-            {order.tableNumber}
+            {tableDisplay}
           </Badge>
         </div>
 
@@ -125,6 +197,7 @@ export default function CustomerOrderTrackingPage() {
             {order.status === 'PREPARING' && 'Chef is Cooking Your Meal'}
             {order.status === 'READY' && 'Your Order is Ready!'}
             {order.status === 'COMPLETED' && 'Order Completed'}
+            {order.status === 'CANCELLED' && 'Order Cancelled'}
           </h1>
 
           <p className="text-xs text-stone-300 mt-1">
@@ -191,48 +264,57 @@ export default function CustomerOrderTrackingPage() {
           </div>
 
           <div className="divide-y divide-border/80 border border-border rounded-xl bg-card p-4 space-y-3">
-            {order.items.map((item) => (
-              <div key={item.id} className="pt-2 first:pt-0 flex items-start justify-between gap-3 text-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-foreground">{item.quantity}x</span>
-                    <span className="font-semibold text-foreground">{item.name}</span>
+            {(order.items || []).map((item: any) => {
+              const itemTotal = item.itemTotal ?? (item.price ? Number((item.price * item.quantity).toFixed(2)) : 0);
+              const customSummary = item.selectedCustomizations
+                ? item.selectedCustomizations.map((c: any) => c.selectedOptionNames?.join(', ')).filter(Boolean).join(' • ')
+                : item.customizations
+                ? item.customizations.map((c: any) => c.name || c.optionName).filter(Boolean).join(' • ')
+                : '';
+
+              return (
+                <div key={item.id} className="pt-2 first:pt-0 flex items-start justify-between gap-3 text-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-foreground">{item.quantity}x</span>
+                      <span className="font-semibold text-foreground">{item.name}</span>
+                    </div>
+                    {customSummary && (
+                      <p className="text-[11px] text-muted-foreground pl-5 mt-0.5">
+                        {customSummary}
+                      </p>
+                    )}
+                    {item.notes && <p className="text-[11px] text-amber-600 italic pl-5 mt-0.5">"{item.notes}"</p>}
                   </div>
-                  {item.selectedCustomizations.length > 0 && (
-                    <p className="text-[11px] text-muted-foreground pl-5 mt-0.5">
-                      {item.selectedCustomizations.map((c) => c.selectedOptionNames.join(', ')).join(' • ')}
-                    </p>
-                  )}
-                  {item.notes && <p className="text-[11px] text-amber-600 italic pl-5 mt-0.5">"{item.notes}"</p>}
+                  <span className="font-bold text-foreground">
+                    {currencyDisplay}
+                    {Number(itemTotal).toFixed(2)}
+                  </span>
                 </div>
-                <span className="font-bold text-foreground">
-                  {currentRestaurant.currency}
-                  {item.itemTotal.toFixed(2)}
-                </span>
-              </div>
-            ))}
+              );
+            })}
 
             <div className="pt-3 space-y-1.5 text-xs text-muted-foreground">
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span>
-                  {currentRestaurant.currency}
-                  {order.subtotal.toFixed(2)}
+                  {currencyDisplay}
+                  {Number(order.subtotal || 0).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Tax</span>
                 <span>
-                  {currentRestaurant.currency}
-                  {order.tax.toFixed(2)}
+                  {currencyDisplay}
+                  {Number(order.tax || 0).toFixed(2)}
                 </span>
               </div>
               <Separator />
               <div className="flex justify-between font-black text-sm text-foreground pt-1">
                 <span>Total</span>
                 <span>
-                  {currentRestaurant.currency}
-                  {order.total.toFixed(2)}
+                  {currencyDisplay}
+                  {Number(order.total || 0).toFixed(2)}
                 </span>
               </div>
             </div>

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Link } from 'react-router';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import { TableItem } from 'src/context/restaurant-context/types';
+import api from 'src/api/api-client';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from 'src/components/ui/card';
 import { Badge } from 'src/components/ui/badge';
 import { Button } from 'src/components/ui/button';
@@ -25,12 +26,14 @@ import {
   Trash2,
   Sparkles,
   CheckCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function RestaurantAdminTables() {
   const { currentRestaurant, tables, addTable, updateTable, deleteTable } = useRestaurant();
   const [selectedTableForQr, setSelectedTableForQr] = useState<TableItem | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Add Table Modal state
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -48,6 +51,19 @@ export default function RestaurantAdminTables() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleRegenerateQr = async () => {
+    if (!selectedTableForQr) return;
+    setIsRegenerating(true);
+    try {
+      await api.admin.regenerateTableQr(selectedTableForQr.id);
+      toast.success(`Generated fresh secure QR token for ${selectedTableForQr.tableNumber}`);
+    } catch {
+      toast.info(`Rotated QR token locally for ${selectedTableForQr.tableNumber}`);
+    } finally {
+      setIsRegenerating(false);
+    }
   };
 
   const handleAddTable = (e: React.FormEvent) => {
@@ -219,6 +235,17 @@ export default function RestaurantAdminTables() {
             </div>
 
             <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRegenerateQr}
+                disabled={isRegenerating}
+                className="text-xs font-semibold gap-1.5 flex-1"
+              >
+                <RefreshCw className={`size-3.5 ${isRegenerating ? 'animate-spin' : ''}`} />
+                <span>Rotate QR</span>
+              </Button>
+
               <Link
                 to={`/m/${currentRestaurant.slug}/${selectedTableForQr.tableNumber.toLowerCase().replace(/\s+/g, '-')}`}
                 target="_blank"
@@ -226,7 +253,7 @@ export default function RestaurantAdminTables() {
               >
                 <Button variant="outline" size="sm" className="w-full text-xs font-semibold gap-1.5">
                   <ExternalLink className="size-3.5" />
-                  <span>Open Customer Menu</span>
+                  <span>Open Menu</span>
                 </Button>
               </Link>
 

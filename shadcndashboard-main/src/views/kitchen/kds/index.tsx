@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import { Order, OrderStatus } from 'src/context/restaurant-context/types';
-import { onOrderCreated } from 'src/api/socket-client';
+import { onOrderCreated, onSocketConnect } from 'src/api/socket-client';
+import api from 'src/api/api-client';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from 'src/components/ui/card';
 import { Badge } from 'src/components/ui/badge';
 import { Button } from 'src/components/ui/button';
@@ -17,14 +18,17 @@ import {
   Sparkles,
   ShoppingBag,
   RotateCcw,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function KitchenDashboard() {
-  const { orders, updateOrderStatus, currentRestaurant } = useRestaurant();
+  const { orders, updateOrderStatus, currentRestaurant, refreshData } = useRestaurant();
   const [activeTab, setActiveTab] = useState<'ACTIVE' | OrderStatus | 'ALL'>('ACTIVE');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Web Audio chime function for action / alert feedback
   const playChime = () => {
@@ -58,6 +62,28 @@ export default function KitchenDashboard() {
     return () => unsub();
   }, [soundEnabled]);
 
+  // Fetch active queue and auto-recover on socket reconnect
+  const fetchActiveKitchenOrders = async (quiet = false) => {
+    if (!quiet) setIsRefreshing(true);
+    try {
+      await refreshData();
+      if (!quiet) toast.success('Kitchen queue synchronized with server');
+    } catch {
+      if (!quiet) toast.error('Failed to sync queue with server');
+    } finally {
+      if (!quiet) setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveKitchenOrders(true);
+    const unsubConnect = onSocketConnect(() => {
+      fetchActiveKitchenOrders(true);
+      toast.info('⚡ Reconnected to server: active orders refreshed');
+    });
+    return () => unsubConnect();
+  }, []);
+
   // Update timer every 10 seconds for real-time elapsed time calculation
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
@@ -80,7 +106,7 @@ export default function KitchenDashboard() {
     return order.status === activeTab;
   });
 
-  const handleNextStatus = (order: Order) => {
+  const handleNextStatus = async (order: Order) => {
     let nextStatus: OrderStatus = order.status;
     let actionLabel = '';
 
@@ -99,9 +125,16 @@ export default function KitchenDashboard() {
     }
 
     if (nextStatus !== order.status) {
-      updateOrderStatus(order.id, nextStatus);
-      playChime();
-      toast.success(`${actionLabel} for ${order.tableNumber} (${order.orderNumber})`);
+      setUpdatingOrderId(order.id);
+      try {
+        await updateOrderStatus(order.id, nextStatus);
+        playChime();
+        toast.success(`${actionLabel} for ${order.tableNumber} (${order.orderNumber})`);
+      } catch (err: any) {
+        toast.error(`Status update failed: ${err?.message || 'Server error'}`);
+      } finally {
+        setUpdatingOrderId(null);
+      }
     }
   };
 
@@ -133,6 +166,17 @@ export default function KitchenDashboard() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchActiveKitchenOrders(false)}
+            disabled={isRefreshing}
+            className="gap-2 text-xs"
+          >
+            <RefreshCw className={`size-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>Sync Queue</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -308,6 +352,7 @@ export default function KitchenDashboard() {
                   {order.status !== 'COMPLETED' ? (
                     <Button
                       onClick={() => handleNextStatus(order)}
+                      disabled={updatingOrderId === order.id}
                       size="sm"
                       className={`text-xs font-semibold rounded-lg gap-1.5 shadow-sm transition-all ${
                         order.status === 'NEW'
@@ -319,11 +364,20 @@ export default function KitchenDashboard() {
                           : 'bg-stone-800 hover:bg-stone-900 text-white'
                       }`}
                     >
-                      {order.status === 'NEW' && 'Accept Order'}
-                      {order.status === 'ACCEPTED' && 'Start Cooking'}
-                      {order.status === 'PREPARING' && 'Mark as Ready'}
-                      {order.status === 'READY' && 'Complete Order'}
-                      <ArrowRight className="size-3.5" />
+                      {updatingOrderId === order.id ? (
+                        <>
+                          <RefreshCw className="size-3.5 animate-spin" />
+                          <span>Updating...</span>
+                        </>
+                      ) : (
+                        <>
+                          {order.status === 'NEW' && 'Accept Order'}
+                          {order.status === 'ACCEPTED' && 'Start Cooking'}
+                          {order.status === 'PREPARING' && 'Mark as Ready'}
+                          {order.status === 'READY' && 'Complete Order'}
+                          <ArrowRight className="size-3.5" />
+                        </>
+                      )}
                     </Button>
                   ) : (
                     <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-300 bg-emerald-50">
