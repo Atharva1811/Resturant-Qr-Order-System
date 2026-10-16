@@ -27,21 +27,22 @@ import {
 export default function RestaurantAdminAnalytics() {
   const { currentRestaurant, orders } = useRestaurant();
   const [timeRange, setTimeRange] = useState<'TODAY' | 'WEEK' | 'MONTH'>('WEEK');
+  const [renderTime] = useState(() => Date.now());
 
   const restaurantOrders = orders.filter((o) => o.restaurantSlug === currentRestaurant.slug);
 
   const filteredOrders = restaurantOrders.filter((order) => {
     if (timeRange === 'TODAY') {
       const orderDate = new Date(order.createdAt).toISOString().split('T')[0];
-      const todayDate = new Date().toISOString().split('T')[0];
+      const todayDate = new Date(renderTime).toISOString().split('T')[0];
       return orderDate === todayDate;
     } else if (timeRange === 'WEEK') {
       const orderTime = new Date(order.createdAt).getTime();
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const sevenDaysAgo = renderTime - 7 * 24 * 60 * 60 * 1000;
       return orderTime >= sevenDaysAgo;
     } else if (timeRange === 'MONTH') {
       const orderTime = new Date(order.createdAt).getTime();
-      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const thirtyDaysAgo = renderTime - 30 * 24 * 60 * 60 * 1000;
       return orderTime >= thirtyDaysAgo;
     }
     return true;

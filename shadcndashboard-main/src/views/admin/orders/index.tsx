@@ -43,6 +43,7 @@ export default function RestaurantAdminOrders() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | OrderStatus>('ALL');
   const [dateFilter, setDateFilter] = useState<'TODAY' | 'WEEK' | 'ALL'>('TODAY');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [renderTime] = useState(() => Date.now());
 
   const restaurantOrders = orders.filter((o) => o.restaurantSlug === currentRestaurant.slug);
 
@@ -51,11 +52,11 @@ export default function RestaurantAdminOrders() {
 
     if (dateFilter === 'TODAY') {
       const orderDate = new Date(order.createdAt).toISOString().split('T')[0];
-      const todayDate = new Date().toISOString().split('T')[0];
+      const todayDate = new Date(renderTime).toISOString().split('T')[0];
       if (orderDate !== todayDate) return false;
     } else if (dateFilter === 'WEEK') {
       const orderTime = new Date(order.createdAt).getTime();
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const sevenDaysAgo = renderTime - 7 * 24 * 60 * 60 * 1000;
       if (orderTime < sevenDaysAgo) return false;
     }
 

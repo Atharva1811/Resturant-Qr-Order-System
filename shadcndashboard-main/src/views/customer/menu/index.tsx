@@ -166,7 +166,7 @@ export default function CustomerMenuPage() {
       return;
     }
     const orderItem: OrderItem = {
-      id: `ci-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: `ci-${item.id}-${cart.length}`,
       menuItemId: item.id,
       name: item.name,
       price: item.price,
