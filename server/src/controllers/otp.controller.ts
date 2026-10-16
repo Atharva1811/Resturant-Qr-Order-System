@@ -30,6 +30,28 @@ export const requestOtp = async (req: Request, res: Response, next: NextFunction
       return;
     }
 
+    // Check resend cooldown: prevent spamming by enforcing 60s cooldown per email
+    const recentRequest = await prisma.customerVerification.findFirst({
+      where: {
+        email: normalizedEmail,
+        restaurantId: restaurant.id,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (recentRequest) {
+      const secondsSinceLastRequest = Math.floor((Date.now() - recentRequest.createdAt.getTime()) / 1000);
+      const COOLDOWN_SECONDS = 60;
+      if (secondsSinceLastRequest < COOLDOWN_SECONDS) {
+        res.status(429).json({
+          success: false,
+          error: `Please wait ${COOLDOWN_SECONDS - secondsSinceLastRequest} seconds before requesting a new code.`,
+          retryAfterSeconds: COOLDOWN_SECONDS - secondsSinceLastRequest,
+        });
+        return;
+      }
+    }
+
     let tableId: string | undefined;
     if (tableNumber) {
       const table = await prisma.table.findFirst({
@@ -42,7 +64,7 @@ export const requestOtp = async (req: Request, res: Response, next: NextFunction
 
     const otp = brevoService.generateOtp();
     const otpHash = brevoService.hashOtp(otp, normalizedEmail);
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
 
     // Save verification record
     await prisma.customerVerification.create({
@@ -58,16 +80,15 @@ export const requestOtp = async (req: Request, res: Response, next: NextFunction
       },
     });
 
-    // Send email via Brevo
-    const emailResult = await brevoService.sendOtpEmail(normalizedEmail, otp, restaurant.name);
+    // Send email via Brevo API
+    await brevoService.sendOtpEmail(normalizedEmail, otp, restaurant.name);
 
+    // CRITICAL: NEVER return the OTP in the API response
     res.json({
       success: true,
-      message: `A 6-digit verification code has been sent to ${normalizedEmail}`,
+      message: `A 6-digit verification code has been sent to ${brevoService.maskEmail(normalizedEmail)}`,
       data: {
         expiresAt: expiresAt.toISOString(),
-        // Return code in dev/test mock mode for seamless automated testing and frontend demo
-        ...(emailResult.isMock ? { mockCode: otp } : {}),
       },
     });
   } catch (error) {
@@ -89,7 +110,7 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
       return;
     }
 
-    // Find the latest active verification record for this email and restaurant
+    // Find latest active verification record for this email and restaurant
     const verification = await prisma.customerVerification.findFirst({
       where: {
         email: normalizedEmail,
@@ -162,7 +183,7 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
       tableNumber: resolvedTableNumber,
     });
 
-    // Mark verified
+    // Invalidate code after successful use by setting verifiedAt
     await prisma.customerVerification.update({
       where: { id: verification.id },
       data: {

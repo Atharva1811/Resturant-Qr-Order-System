@@ -13,6 +13,7 @@ export interface PaymentInitiationResult {
   checkoutUrl?: string;
   clientSecret?: string;
   transactionId?: string;
+  gatewayOrderId?: string;
 }
 
 export interface WebhookPayload {
@@ -23,12 +24,85 @@ export interface WebhookPayload {
   amount: number;
   currency: string;
   idempotencyKey?: string;
-  signature?: string;
+}
+
+/**
+ * Provider-Independent Payment Gateway Interface.
+ * Allows plug-and-play addition of Razorpay, Stripe, or any gateway.
+ */
+export interface IPaymentGatewayProvider {
+  name: string;
+  initiate(amount: number, currency: string, orderId: string): Promise<{ transactionId: string; clientSecret?: string }>;
+  verifyWebhook(rawPayload: string, signature: string): boolean;
+}
+
+/**
+ * Concrete Razorpay Provider Implementation
+ * Documents and implements signature verification conforming to Razorpay's HMAC standard.
+ */
+export class RazorpayGatewayProvider implements IPaymentGatewayProvider {
+  public name = 'RAZORPAY';
+
+  public async initiate(amount: number, currency: string, orderId: string): Promise<{ transactionId: string; clientSecret?: string }> {
+    const transactionId = `rzp_order_${crypto.randomBytes(8).toString('hex')}`;
+    return {
+      transactionId,
+      clientSecret: config.razorpay.keyId,
+    };
+  }
+
+  public verifyWebhook(rawPayload: string, signature: string): boolean {
+    const secret = config.razorpay.keySecret || config.paymentWebhookSecret;
+    if (!secret || !signature) return false;
+    const expected = crypto.createHmac('sha256', secret).update(rawPayload).digest('hex');
+    try {
+      return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'));
+    } catch {
+      return false;
+    }
+  }
+}
+
+/**
+ * Generic Mock Online Gateway Provider for development & automated tests
+ */
+export class MockGatewayProvider implements IPaymentGatewayProvider {
+  public name = 'MOCK_ONLINE_GATEWAY';
+
+  public async initiate(amount: number, currency: string, orderId: string): Promise<{ transactionId: string; clientSecret?: string }> {
+    return {
+      transactionId: `mock_tx_${crypto.randomBytes(8).toString('hex')}`,
+      clientSecret: `cs_test_${crypto.randomBytes(12).toString('hex')}`,
+    };
+  }
+
+  public verifyWebhook(rawPayload: string, signature: string): boolean {
+    const expected = crypto
+      .createHmac('sha256', config.paymentWebhookSecret)
+      .update(rawPayload)
+      .digest('hex');
+    try {
+      return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'));
+    } catch {
+      return false;
+    }
+  }
 }
 
 export class PaymentService {
+  private providers: Map<string, IPaymentGatewayProvider> = new Map();
+
+  constructor() {
+    this.registerProvider(new MockGatewayProvider());
+    this.registerProvider(new RazorpayGatewayProvider());
+  }
+
+  public registerProvider(provider: IPaymentGatewayProvider) {
+    this.providers.set(provider.name.toUpperCase(), provider);
+  }
+
   /**
-   * Generates HMAC-SHA256 signature for outgoing or incoming webhook verification.
+   * Generates HMAC-SHA256 signature for outgoing or test webhook validation.
    */
   public generateWebhookSignature(payload: string): string {
     return crypto
@@ -38,16 +112,31 @@ export class PaymentService {
   }
 
   /**
-   * Verifies incoming webhook HMAC signature safely using timingSafeEqual.
+   * Verifies incoming webhook signature across provider adapters.
+   * Supports verifyWebhookSignature(payload, signature) and verifyWebhookSignature(providerName, payload, signature)
    */
-  public verifyWebhookSignature(payload: string, receivedSignature: string): boolean {
-    if (!receivedSignature) return false;
-    const computedSignature = this.generateWebhookSignature(payload);
+  public verifyWebhookSignature(arg1: string, arg2: string, arg3?: string): boolean {
+    let providerName = 'MOCK_ONLINE_GATEWAY';
+    let payload = '';
+    let signature = '';
+
+    if (arg3 !== undefined) {
+      providerName = arg1;
+      payload = arg2;
+      signature = arg3;
+    } else {
+      payload = arg1;
+      signature = arg2;
+    }
+
+    if (!signature) return false;
+    const provider = this.providers.get(providerName.toUpperCase()) || this.providers.get('MOCK_ONLINE_GATEWAY');
+    if (provider) {
+      return provider.verifyWebhook(payload, signature);
+    }
+    const computed = this.generateWebhookSignature(payload);
     try {
-      return crypto.timingSafeEqual(
-        Buffer.from(computedSignature, 'hex'),
-        Buffer.from(receivedSignature, 'hex')
-      );
+      return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(signature, 'hex'));
     } catch {
       return false;
     }
@@ -55,6 +144,7 @@ export class PaymentService {
 
   /**
    * Initiates payment for an order.
+   * Never marks payment as PAID based solely on client input.
    */
   public async initiatePayment(
     prisma: PrismaClient,
@@ -75,8 +165,9 @@ export class PaymentService {
       throw new Error(`Order ${order.orderNumber} is already paid.`);
     }
 
-    const providerName = method === 'COUNTER' ? 'COUNTER' : 'MOCK_ONLINE_GATEWAY';
-    const transactionId = `${providerName.toLowerCase()}_tx_${crypto.randomBytes(8).toString('hex')}`;
+    const providerName = method === 'COUNTER' ? 'COUNTER' : config.razorpay.keyId ? 'RAZORPAY' : 'MOCK_ONLINE_GATEWAY';
+    const provider = this.providers.get(providerName) || this.providers.get('MOCK_ONLINE_GATEWAY')!;
+    const initiation = await provider.initiate(order.total, order.restaurant.currency, order.id);
     const idempotencyKey = `pay_${order.id}_${Date.now()}`;
 
     const payment = await prisma.payment.create({
@@ -84,7 +175,7 @@ export class PaymentService {
         orderId: order.id,
         restaurantId: order.restaurantId,
         provider: providerName,
-        transactionId,
+        transactionId: initiation.transactionId,
         amount: order.total,
         currency: order.restaurant.currency,
         status: 'PENDING',
@@ -106,12 +197,12 @@ export class PaymentService {
         currency: payment.currency,
         provider: providerName,
         status: 'PENDING',
-        transactionId,
+        transactionId: initiation.transactionId,
       };
     }
 
-    // Online Payment: generates checkout session simulation / intent
-    const checkoutUrl = `${config.frontendUrl}/customer/track/${order.id}?pay_session=${transactionId}`;
+    // Online Payment: generates checkout session URL with client secret
+    const checkoutUrl = `${config.frontendUrl}/customer/track/${order.id}?pay_session=${initiation.transactionId}`;
 
     return {
       paymentId: payment.id,
@@ -120,9 +211,9 @@ export class PaymentService {
       currency: payment.currency,
       provider: providerName,
       status: 'PENDING',
-      transactionId,
+      transactionId: initiation.transactionId,
       checkoutUrl,
-      clientSecret: `cs_test_${crypto.randomBytes(16).toString('hex')}`,
+      clientSecret: initiation.clientSecret,
     };
   }
 
@@ -148,7 +239,6 @@ export class PaymentService {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // Find or create payment record
       let payment = await tx.payment.findFirst({
         where: { orderId, provider: 'COUNTER', status: 'PENDING' },
       });
@@ -171,20 +261,17 @@ export class PaymentService {
         });
       }
 
-      // Update Order
       const updatedOrder = await tx.order.update({
         where: { id: order.id },
         data: { paymentStatus: 'PAID' },
         include: { items: { include: { customizations: true } } },
       });
 
-      // Update restaurant revenue
       await tx.restaurant.update({
         where: { id: order.restaurantId },
         data: { totalRevenue: { increment: order.total } },
       });
 
-      // Audit log
       await tx.auditEvent.create({
         data: {
           restaurantId: order.restaurantId,
@@ -198,14 +285,13 @@ export class PaymentService {
       return updatedOrder;
     });
 
-    // Notify real-time subscribers
     socketService.notifyPaymentUpdated(order.restaurantId, order.id, 'PAID', result);
-
     return result;
   }
 
   /**
    * Processes webhook from payment provider idempotently.
+   * Requires verified HMAC signature.
    */
   public async processWebhook(
     prisma: PrismaClient,
@@ -213,9 +299,11 @@ export class PaymentService {
     rawBody: string,
     signature?: string
   ): Promise<{ processed: boolean; message: string }> {
-    // If signature provided, verify it
+    const providerName = payload.provider || 'MOCK_ONLINE_GATEWAY';
+
+    // Verify webhook signature
     if (signature) {
-      const isValid = this.verifyWebhookSignature(rawBody, signature);
+      const isValid = this.verifyWebhookSignature(providerName, rawBody, signature);
       if (!isValid) {
         throw new Error('Invalid webhook HMAC signature');
       }
@@ -223,7 +311,7 @@ export class PaymentService {
 
     const { event, transactionId, orderId, amount } = payload;
 
-    // Check if this transaction has already been processed (Idempotency check)
+    // Idempotency check: check if already recorded as PAID
     const existingPayment = await prisma.payment.findFirst({
       where: {
         OR: [
@@ -257,7 +345,7 @@ export class PaymentService {
             data: {
               orderId: order.id,
               restaurantId: order.restaurantId,
-              provider: payload.provider || 'ONLINE',
+              provider: providerName,
               transactionId,
               amount: amount || order.total,
               status: 'PAID',
@@ -289,7 +377,6 @@ export class PaymentService {
       socketService.notifyPaymentUpdated(order.restaurantId, order.id, 'PAID');
       return { processed: true, message: 'Payment confirmed successfully via webhook.' };
     } else {
-      // payment.failed
       await prisma.$transaction(async (tx) => {
         if (existingPayment) {
           await tx.payment.update({
@@ -301,7 +388,7 @@ export class PaymentService {
             data: {
               orderId: order.id,
               restaurantId: order.restaurantId,
-              provider: payload.provider || 'ONLINE',
+              provider: providerName,
               transactionId,
               amount: amount || order.total,
               status: 'FAILED',

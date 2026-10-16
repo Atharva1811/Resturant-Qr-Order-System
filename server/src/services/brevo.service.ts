@@ -20,7 +20,19 @@ export class BrevoService {
   }
 
   /**
-   * Generates a secure, cryptographically random 6-digit numeric OTP.
+   * Masks email address to protect customer PII from unnecessary log exposure.
+   * e.g., 'elena.rostova@example.com' -> 'e***a@example.com'
+   */
+  public maskEmail(email: string): string {
+    const clean = email.toLowerCase().trim();
+    const [local, domain] = clean.split('@');
+    if (!domain) return '***';
+    if (local.length <= 2) return `${local[0] || '*'}***@${domain}`;
+    return `${local[0]}***${local[local.length - 1]}@${domain}`;
+  }
+
+  /**
+   * Generates a cryptographically secure 6-digit numeric OTP.
    */
   public generateOtp(): string {
     return crypto.randomInt(100000, 1000000).toString();
@@ -38,8 +50,18 @@ export class BrevoService {
 
   /**
    * Verifies the user-entered OTP against the stored salted hash.
+   * Also verifies development bypass only if explicitly enabled and strictly outside of production.
    */
   public verifyOtpHash(otp: string, email: string, storedHash: string): boolean {
+    // Explicit development bypass check (strictly disabled in production)
+    if (
+      config.enableDevOtpBypass &&
+      config.nodeEnv !== 'production' &&
+      otp.trim() === config.devStaticOtp
+    ) {
+      return true;
+    }
+
     const candidateHash = this.hashOtp(otp, email);
     try {
       return crypto.timingSafeEqual(
@@ -53,28 +75,32 @@ export class BrevoService {
 
   /**
    * Sends transactional email containing the 6-digit verification code.
-   * Gracefully falls back to mock logger when credentials are not configured or in test mode.
+   * Gracefully falls back to mock delivery when credentials are not configured or in test mode.
+   * Never logs the raw OTP or full email in logs.
    */
-  public async sendOtpEmail(email: string, otp: string, restaurantName: string = 'Our Restaurant'): Promise<{
+  public async sendOtpEmail(
+    email: string,
+    otp: string,
+    restaurantName: string = 'Our Restaurant'
+  ): Promise<{
     delivered: boolean;
     isMock: boolean;
     messageId?: string;
   }> {
-    const isMock = !this.isConfigured || process.env.NODE_ENV === 'test';
+    const isMock = !this.isConfigured || config.nodeEnv === 'test';
+    const masked = this.maskEmail(email);
 
     if (isMock) {
-      console.log(`\n======================================================`);
-      console.log(`[BREVO MOCK EMAIL OTP] To: ${email}`);
-      console.log(`Restaurant: ${restaurantName}`);
-      console.log(`Your 6-digit verification code: >>> ${otp} <<<`);
-      console.log(`Valid for 5 minutes.`);
-      console.log(`======================================================\n`);
+      // Safe logging without exposing secret code or full email
+      console.log(
+        `[Brevo Service] Simulated email OTP dispatch to ${masked} for "${restaurantName}". Code hashed with HMAC-SHA256 and stored with 5-minute expiry.`
+      );
       return { delivered: true, isMock: true, messageId: `mock-${Date.now()}` };
     }
 
     try {
       const sendSmtpEmail = new SendSmtpEmail();
-      sendSmtpEmail.subject = `${otp} is your verification code for ${restaurantName}`;
+      sendSmtpEmail.subject = `Your verification code for ${restaurantName}`;
       sendSmtpEmail.sender = {
         name: config.brevo.senderName,
         email: config.brevo.senderEmail,
@@ -96,7 +122,7 @@ export class BrevoService {
       const response = await this.apiInstance.sendTransacEmail(sendSmtpEmail);
       return { delivered: true, isMock: false, messageId: (response as any)?.body?.messageId };
     } catch (error: any) {
-      console.error('[Brevo Email Error]:', error?.response?.body || error.message);
+      console.error(`[Brevo Email Error for ${masked}]:`, error?.response?.body?.message || error.message);
       throw new Error(`Failed to send verification email: ${error.message}`);
     }
   }

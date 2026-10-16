@@ -13,4 +13,12 @@ export const config = {
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   paymentWebhookSecret: process.env.PAYMENT_WEBHOOK_SECRET || 'whsec_sudarshan_test_secret_2026',
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID || '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET || '',
+  },
+  // Development-only guards (strictly unreachable in production)
+  enableDevOtpBypass: process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEV_OTP_BYPASS === 'true',
+  devStaticOtp: process.env.DEV_STATIC_OTP || '123456',
+  seedAdminPassword: process.env.SEED_ADMIN_PASSWORD || 'DevAdminPass123!',
 };
