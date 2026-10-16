@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import api from 'src/api/api-client';
+import { onOrderCreated, onOrderStatusUpdated, joinRestaurantRoom } from 'src/api/socket-client';
 import {
   Role,
   OrderStatus,
@@ -202,6 +204,58 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const currentRestaurant =
     restaurants.find((r) => r.slug === currentRestaurantSlug) || restaurants[0];
 
+  // Socket.IO real-time event listener for live order sync
+  useEffect(() => {
+    try {
+      if (currentRestaurant?.id) {
+        joinRestaurantRoom(currentRestaurant.id);
+      }
+    } catch {
+      // Ignored if socket unavailable
+    }
+
+    const unsubCreated = onOrderCreated((newOrder) => {
+      if (!newOrder) return;
+      const orderSlug = newOrder.restaurantSlug || newOrder.restaurant?.slug;
+      if (orderSlug === currentRestaurantSlug || !orderSlug) {
+        setOrders((prev) => {
+          if (prev.some((o) => o.id === newOrder.id || o.orderNumber === newOrder.orderNumber)) {
+            return prev;
+          }
+          const mappedOrder: Order = {
+            id: newOrder.id,
+            orderNumber: newOrder.orderNumber,
+            restaurantSlug: orderSlug || currentRestaurantSlug,
+            tableNumber: newOrder.tableNumberSnapshot || newOrder.table?.tableNumber || 'Counter',
+            customerName: newOrder.customerName,
+            customerEmail: newOrder.customerEmail,
+            items: newOrder.items || [],
+            subtotal: newOrder.subtotal,
+            tax: newOrder.tax,
+            total: newOrder.total,
+            paymentMethod: newOrder.paymentMethod || 'COUNTER',
+            paymentStatus: newOrder.paymentStatus || 'PENDING',
+            status: newOrder.status || 'NEW',
+            createdAt: newOrder.createdAt || new Date().toISOString(),
+            notes: newOrder.notes,
+          };
+          return [mappedOrder, ...prev];
+        });
+      }
+    });
+
+    const unsubUpdated = onOrderStatusUpdated(({ orderId, status }) => {
+      setOrders((prev) =>
+        prev.map((ord) => (ord.id === orderId ? { ...ord, status: status as OrderStatus } : ord))
+      );
+    });
+
+    return () => {
+      unsubCreated();
+      unsubUpdated();
+    };
+  }, [currentRestaurant?.id, currentRestaurantSlug]);
+
   // Cart calculations
   const cartSubtotal = cart.reduce((acc, item) => acc + item.itemTotal, 0);
   const cartTax = Number((cartSubtotal * (currentRestaurant.taxRate / 100)).toFixed(2));
@@ -261,6 +315,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Orders
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
+    // Optimistic local update
     setOrders((prev) =>
       prev.map((ord) => {
         if (ord.id === orderId) {
@@ -273,6 +328,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return ord;
       })
     );
+
+    // Sync with backend API
+    api.kitchen.updateOrderStatus(orderId, status).catch(() => {
+      // Backend may be offline or mock mode
+    });
   };
 
   const createCustomerOrder = (payload: {
@@ -321,6 +381,42 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
 
     clearCart();
+
+    // Fire backend order creation with server-side price validation
+    api.public
+      .createOrder({
+        restaurantSlug: payload.restaurantSlug,
+        tableNumber: payload.tableNumber,
+        customerName: payload.customerName,
+        customerEmail: payload.customerEmail,
+        paymentMethod: payload.paymentMethod,
+        notes: payload.notes,
+        items: payload.items.map((i) => ({
+          menuItemId: i.menuItemId,
+          quantity: i.quantity,
+          notes: i.notes,
+        })),
+      })
+      .then((res) => {
+        if (res?.order?.id) {
+          // If server returned a database order ID and number, reconcile local order
+          setOrders((prev) =>
+            prev.map((o) =>
+              o.id === newOrder.id
+                ? {
+                    ...o,
+                    id: res.order.id,
+                    orderNumber: res.order.orderNumber,
+                  }
+                : o
+            )
+          );
+        }
+      })
+      .catch(() => {
+        // Fallback to local optimistic order
+      });
+
     return newOrder;
   };
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
+import { joinOrderRoom, onOrderStatusUpdated } from 'src/api/socket-client';
 import { Card, CardHeader, CardContent } from 'src/components/ui/card';
 import { Badge } from 'src/components/ui/badge';
 import { Button } from 'src/components/ui/button';
@@ -28,6 +29,24 @@ export default function CustomerOrderTrackingPage() {
     // Flash animation on status change
     setPulseKey((prev) => prev + 1);
   }, [order?.status]);
+
+  // Real-time Socket.IO room subscription for live tracking
+  useEffect(() => {
+    if (!orderId) return;
+    try {
+      joinOrderRoom(orderId);
+    } catch {
+      // Ignored if socket unavailable
+    }
+
+    const unsub = onOrderStatusUpdated((data) => {
+      if (data?.orderId === orderId) {
+        setPulseKey((prev) => prev + 1);
+      }
+    });
+
+    return () => unsub();
+  }, [orderId]);
 
   if (!order) {
     return (

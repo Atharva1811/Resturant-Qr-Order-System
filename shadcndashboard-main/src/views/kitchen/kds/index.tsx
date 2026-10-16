@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import { Order, OrderStatus } from 'src/context/restaurant-context/types';
+import { onOrderCreated } from 'src/api/socket-client';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from 'src/components/ui/card';
 import { Badge } from 'src/components/ui/badge';
 import { Button } from 'src/components/ui/button';
@@ -25,12 +26,6 @@ export default function KitchenDashboard() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
-  // Update timer every 10 seconds for real-time elapsed time calculation
-  useEffect(() => {
-    const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
-    return () => clearInterval(interval);
-  }, []);
-
   // Web Audio chime function for action / alert feedback
   const playChime = () => {
     if (!soundEnabled) return;
@@ -51,6 +46,23 @@ export default function KitchenDashboard() {
       // AudioContext unavailable or blocked
     }
   };
+
+  // Real-time audio alert when new order arrives via Socket.IO
+  useEffect(() => {
+    const unsub = onOrderCreated((newOrder) => {
+      if (newOrder) {
+        playChime();
+        toast.info(`🔔 New incoming ticket: ${newOrder.orderNumber || 'Order'} (Table ${newOrder.tableNumberSnapshot || 'QR'})`);
+      }
+    });
+    return () => unsub();
+  }, [soundEnabled]);
+
+  // Update timer every 10 seconds for real-time elapsed time calculation
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const getElapsedTimeMinutes = (isoString: string) => {
     const elapsedMs = currentTime - new Date(isoString).getTime();

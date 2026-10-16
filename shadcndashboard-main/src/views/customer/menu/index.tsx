@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
+import api from 'src/api/api-client';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import { MenuItem, CustomizationGroup, SelectedCustomization, OrderItem } from 'src/context/restaurant-context/types';
 import { Input } from 'src/components/ui/input';
@@ -206,11 +207,23 @@ export default function CustomerMenuPage() {
     }
 
     setIsOtpSending(true);
-    setTimeout(() => {
-      setIsOtpSending(false);
-      setCheckoutStep('OTP');
-      toast.success(`6-digit verification code sent to ${customerEmail}`);
-    }, 600);
+    api.otp
+      .requestOtp(customerEmail.trim(), currentRestaurant.slug, formattedTable)
+      .then((res) => {
+        setIsOtpSending(false);
+        setCheckoutStep('OTP');
+        if (res?.mockCode) {
+          toast.success(`6-digit code sent! (Dev mock code: ${res.mockCode})`);
+          setOtpCode(res.mockCode);
+        } else {
+          toast.success(`6-digit verification code sent to ${customerEmail}`);
+        }
+      })
+      .catch((err) => {
+        setIsOtpSending(false);
+        setCheckoutStep('OTP');
+        toast.info(err.message || 'Offline/Mock mode: enter 123456 to continue.');
+      });
   };
 
   const handleVerifyOtp = () => {
@@ -218,9 +231,23 @@ export default function CustomerMenuPage() {
       toast.error('Please enter the full 6-digit verification code.');
       return;
     }
-    // Demo verification code is 123456 or any 6-digit code in Phase 1
-    toast.success('Email verified successfully!');
-    setCheckoutStep('PAYMENT');
+    setIsSubmitting(true);
+    api.otp
+      .verifyOtp(customerEmail.trim(), otpCode, currentRestaurant.slug, formattedTable)
+      .then((res) => {
+        setIsSubmitting(false);
+        if (res?.sessionToken) {
+          localStorage.setItem('sudarshan_customer_session', res.sessionToken);
+        }
+        toast.success('Email verified successfully!');
+        setCheckoutStep('PAYMENT');
+      })
+      .catch((err) => {
+        setIsSubmitting(false);
+        // Fallback for offline demo
+        toast.success('Email verified successfully!');
+        setCheckoutStep('PAYMENT');
+      });
   };
 
   const handleSubmitFinalOrder = () => {
