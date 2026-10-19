@@ -1,0 +1,1 @@
+import{n as e,s as t,t as n}from"./jsx-runtime-CdArH33I.js";import{h as r,m as i}from"./index-DJ1sl0wZ.js";var a=t(e(),1);function o({children:e}){let{pathname:t}=r();return(0,a.useEffect)(()=>{window.scrollTo({top:0,left:0,behavior:`smooth`})},[t]),e||null}var s=n(),c=()=>(0,s.jsx)(o,{children:(0,s.jsx)(i,{})});export{c as default};
