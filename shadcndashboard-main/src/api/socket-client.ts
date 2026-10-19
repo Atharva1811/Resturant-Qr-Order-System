@@ -1,11 +1,12 @@
 import { io, Socket } from 'socket.io-client';
+import { BRAND_CONFIG } from 'src/config/brand.config';
 
 const rawSocketUrl =
   import.meta.env.VITE_SOCKET_URL ||
   (import.meta.env.VITE_API_URL
     ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
     : import.meta.env.PROD
-    ? 'https://sudarshan-qr-api.onrender.com'
+    ? 'https://servora-api.onrender.com'
     : 'http://localhost:5000');
 
 const SOCKET_SERVER_URL = rawSocketUrl.replace(/\/+$/, '');
@@ -14,7 +15,7 @@ let socket: Socket | null = null;
 
 export const getSocket = (): Socket => {
   if (!socket) {
-    const token = localStorage.getItem('sudarshan_auth_token');
+    const token = localStorage.getItem(BRAND_CONFIG.authTokenKey);
     socket = io(SOCKET_SERVER_URL, {
       auth: { token },
       autoConnect: true,
@@ -24,7 +25,7 @@ export const getSocket = (): Socket => {
     });
 
     socket.on('connect', () => {
-      console.log('⚡ Connected to Sudarshan Real-time Socket Server');
+      console.log('⚡ Connected to Servora Real-time Socket Server');
     });
 
     socket.on('disconnect', (reason) => {

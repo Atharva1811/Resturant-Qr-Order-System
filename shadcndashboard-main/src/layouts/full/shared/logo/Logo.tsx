@@ -12,7 +12,7 @@ const Logo = () => {
                 size="lg"
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-                <img src={LogoIcon} alt="logo" />
+                <img src={LogoIcon} alt="Servora" width={28} height={28} />
             </SidebarMenuButton>
         </Link>
     )

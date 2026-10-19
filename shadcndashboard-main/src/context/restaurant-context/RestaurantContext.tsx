@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from 'src/api/api-client';
+import { BRAND_CONFIG } from 'src/config/brand.config';
 import { onOrderCreated, onOrderStatusUpdated, joinRestaurantRoom } from 'src/api/socket-client';
 import {
   Role,
@@ -87,7 +88,7 @@ interface RestaurantContextType {
   resetToInitialData: () => void;
 }
 
-const STORAGE_KEY = 'qr_restaurant_saas_state_v2';
+const STORAGE_KEY = BRAND_CONFIG.cartKey;
 
 const DEFAULT_FALLBACK_RESTAURANT: Restaurant = {
   id: 'rustic-hearth-tenant',
@@ -223,7 +224,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
 
       // 2. If authenticated token exists, fetch authorized tenant data
-      const token = localStorage.getItem('sudarshan_auth_token');
+      const token = localStorage.getItem(BRAND_CONFIG.authTokenKey);
       if (token) {
         const meRes = await api.auth.getMe().catch(() => null);
         const user = meRes?.data || meRes;

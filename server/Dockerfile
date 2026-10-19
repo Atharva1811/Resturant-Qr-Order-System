@@ -1,4 +1,4 @@
-# Production Multi-Stage Dockerfile for Sudarshan Backend
+# Production Multi-Stage Dockerfile for Servora Backend
 FROM node:20-alpine AS builder
 
 WORKDIR /app

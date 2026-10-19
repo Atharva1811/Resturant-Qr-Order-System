@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: sudarshan-restaurant-server
+    name: servora-restaurant-server
     runtime: node
     plan: starter
     rootDir: server
@@ -21,8 +21,8 @@ services:
       - key: BREVO_API_KEY
         sync: false
       - key: BREVO_SENDER_EMAIL
-        value: orders@sudarshanqr.com
+        value: orders@servora.app
       - key: BREVO_SENDER_NAME
-        value: Sudarshan QR Ordering
+        value: Servora QR Ordering
       - key: PAYMENT_WEBHOOK_SECRET
         generateValue: true

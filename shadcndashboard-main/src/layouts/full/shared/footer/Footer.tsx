@@ -1,37 +1,30 @@
 import { Link } from "react-router";
+import { BRAND_CONFIG } from "src/config/brand.config";
 
-
-type SearchType = {
+type FooterLink = {
     title: string;
     href: string;
 };
 
-const searchSugg: SearchType[] = [
-    { title: "Support", href: "https://shadcndashboard.dev/support" },
-    { title: "License", href: "https://shadcndashboard.dev/license" },
+const footerLinks: FooterLink[] = [
+    { title: "Documentation", href: "#/admin/dashboard" },
+    { title: "Support", href: `mailto:${BRAND_CONFIG.supportEmail}` },
+    { title: "Privacy & Terms", href: "#" },
 ];
 
 export default function Footer() {
     return (
-        <div className="flex md:flex-row flex-col items-center justify-between gap-3 text-center">
-            <p className="text-sm text-muted-foreground">
-                © 2026 by{" "}
-                <Link
-                    to="https://www.wrappixel.com/" target="_blank"
-                    className="hover:text-primary text-muted-foreground"
-                >
-                    shadcndashboard
-                </Link>
-                , creating a better web for you.
+        <div className="flex md:flex-row flex-col items-center justify-between gap-3 text-center py-4 border-t border-border/40 mt-auto">
+            <p className="text-xs text-muted-foreground">
+                {BRAND_CONFIG.copyright} — <span className="text-foreground/80 font-medium">{BRAND_CONFIG.tagline}</span>
             </p>
 
             <div className="flex gap-4">
-                {searchSugg.map((item, index) => (
+                {footerLinks.map((item, index) => (
                     <Link
                         key={index}
-                        target="_blank"
                         to={item.href}
-                        className="text-sm hover:text-primary text-muted-foreground"
+                        className="text-xs hover:text-primary text-muted-foreground transition-colors"
                     >
                         {item.title}
                     </Link>

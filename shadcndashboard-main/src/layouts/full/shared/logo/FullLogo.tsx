@@ -4,22 +4,22 @@ import Logowhite from "src/assets/images/logos/whitelogo.svg";
 
 const FullLogo = () => {
   return (
-    <Link to={'/'} className="max-w-[40px] block lg:max-w-[120px] overflow-hidden">
-      {/* Dark Logo   */}
+    <Link to={'/'} className="flex items-center gap-2 overflow-hidden py-1">
+      {/* Dark Logo (shown in light mode) */}
       <img
         src={Logo}
-        alt='logo'
-        width={100}
-        height={32}
-        className='block dark:hidden max-w-[120px] rtl:scale-x-[-1]'
+        alt='Servora'
+        width={132}
+        height={34}
+        className='block dark:hidden max-w-[136px] h-auto'
       />
-      {/* Light Logo  */}
+      {/* White Logo (shown in dark mode) */}
       <img
         src={Logowhite}
-        alt='logo'
-        width={100}
-        height={32}
-        className='hidden dark:block max-w-[120px] rtl:scale-x-[-1]'
+        alt='Servora'
+        width={132}
+        height={34}
+        className='hidden dark:block max-w-[136px] h-auto'
       />
     </Link>
 

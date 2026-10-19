@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import { TableItem } from 'src/context/restaurant-context/types';
 import api from 'src/api/api-client';
+import { BRAND_CONFIG } from 'src/config/brand.config';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from 'src/components/ui/card';
 import { Badge } from 'src/components/ui/badge';
 import { Button } from 'src/components/ui/button';
@@ -234,7 +235,7 @@ export default function RestaurantAdminTables() {
               </p>
 
               <div className="mt-3 text-[10px] text-stone-400 font-mono">
-                Powered by Sudarshan QR SaaS
+                {BRAND_CONFIG.poweredBy}
               </div>
             </div>
 

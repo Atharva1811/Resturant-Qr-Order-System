@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router';
 import api from 'src/api/api-client';
+import { BRAND_CONFIG } from 'src/config/brand.config';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import { MenuItem, CustomizationGroup, SelectedCustomization, OrderItem } from 'src/context/restaurant-context/types';
 import { Input } from 'src/components/ui/input';
@@ -281,7 +282,7 @@ export default function CustomerMenuPage() {
       .then((res) => {
         setIsSubmitting(false);
         if (res?.sessionToken) {
-          localStorage.setItem('sudarshan_customer_session', res.sessionToken);
+          localStorage.setItem(BRAND_CONFIG.customerSessionKey, res.sessionToken);
         }
         toast.success('Email verified successfully!');
         setCheckoutStep('PAYMENT');
@@ -300,7 +301,7 @@ export default function CustomerMenuPage() {
 
     setIsSubmitting(true);
     try {
-      const sessionToken = localStorage.getItem('sudarshan_customer_session') || undefined;
+      const sessionToken = localStorage.getItem(BRAND_CONFIG.customerSessionKey) || undefined;
 
       const response = await api.public.createOrder({
         restaurantSlug: currentRestaurant.slug,

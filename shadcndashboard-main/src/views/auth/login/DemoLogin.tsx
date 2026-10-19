@@ -8,6 +8,7 @@ import { Input } from 'src/components/ui/input';
 import { Label } from 'src/components/ui/label';
 import { UtensilsCrossed, Lock, Mail, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BRAND_CONFIG } from 'src/config/brand.config';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -70,12 +71,12 @@ export default function Login() {
       <Card className="w-full max-w-md border border-border shadow-lg rounded-2xl bg-card overflow-hidden">
         {/* Brand Header */}
         <div className="p-6 text-center bg-stone-900 text-white border-b border-stone-800">
-          <div className="size-12 rounded-2xl bg-amber-600 text-white flex items-center justify-center mx-auto mb-2.5 shadow-md">
+          <div className="size-12 rounded-2xl bg-gradient-to-tr from-amber-600 to-rose-600 text-white flex items-center justify-center mx-auto mb-2.5 shadow-md">
             <UtensilsCrossed className="size-6" />
           </div>
-          <h1 className="text-xl font-black tracking-tight">Sudarshan QR SaaS</h1>
+          <h1 className="text-xl font-black tracking-tight">{BRAND_CONFIG.name}</h1>
           <p className="text-xs text-stone-300 mt-1">
-            Enterprise QR-Based Restaurant Order Management System
+            {BRAND_CONFIG.tagline}
           </p>
         </div>
 

@@ -50,7 +50,7 @@ describe('Auth & RBAC Guards Integration Tests', () => {
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('UP');
-    expect(res.body.service).toContain('Sudarshan QR');
+    expect(res.body.service).toContain('Servora QR');
   });
 
   it('blocks unauthenticated requests to protected admin routes with 401', async () => {

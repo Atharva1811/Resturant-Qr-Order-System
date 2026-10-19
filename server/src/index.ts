@@ -11,7 +11,7 @@ socketService.initialize(server);
 
 server.listen(config.port, () => {
   console.log(`\n======================================================`);
-  console.log(`🚀 Sudarshan QR Backend running on port ${config.port}`);
+  console.log(`🚀 Servora QR Backend running on port ${config.port}`);
   console.log(`🌍 Environment: ${config.nodeEnv}`);
   console.log(`📡 Socket.IO Real-time Engine active`);
   console.log(`📨 Brevo Transactional Email: ${config.brevo.apiKey ? 'Configured' : 'Dev Mock Mode Active'}`);

@@ -1,37 +1,30 @@
 # CLAUDE.md
 
-This is a Vite + React 19 + TypeScript admin dashboard ("shadcn-dashboard-free"), styled with Tailwind CSS v4 and Base UI primitives. It is a client-side SPA (no server framework) using `react-router` for routing, deployed as a static build (Netlify via `netlify.toml`, or Docker via `Dockerfile` + nginx).
+This is the frontend single-page application for **Servora** — Restaurant Ordering, Simplified.
 
 ## Stack
 
-- **Build tool**: Vite (`vite.config.ts`), TypeScript project compiled with `tsc` before build
-- **Routing**: `react-router` (client-side, SPA) — routes under `src/routes`
-- **UI**: Base UI primitives (`@base-ui/react`), Tailwind CSS v4, `class-variance-authority`, `tailwind-merge`
-- **Data fetching / mocking**: `swr`, `msw` (mock service worker) — see `src/api/mocks`
-- **Charts**: `recharts`
-- **Icons**: `lucide-react`, `@iconify/react`
+- **Framework & Language**: React 19 + TypeScript (Vite 5)
+- **Routing**: `react-router` v7 with `basename: import.meta.env.BASE_URL`
+- **UI & Styling**: Radix UI / Base UI, Tailwind CSS v4, Lucide React, Lucide icons
+- **State Management**: `RestaurantContext` for active tenant, cart, live orders, staff, tables, and role authorization
+- **Real-Time Engine**: `socket.io-client` with automatic order room subscription
+- **API Communication**: Typed REST API client (`src/api/api-client.ts`) with JWT bearer tokens
 
-## Project structure
+## Project Structure
 
-- `src/components` — reusable UI components
-- `src/views` — page-level view components (feature screens)
-- `src/routes` — route definitions
-- `src/layouts` — layout shells (sidebar/header wrappers)
-- `src/api` — mock data + fetchers (`global-fetcher.ts`, `mocks/handlers`)
-- `src/context` — React context providers
-- `src/hooks` — custom hooks
-- `src/lib` — helpers
-- `src/types` — shared TypeScript types
-- `src/css` — global styles
+- `src/components/ui` — Reusable Radix UI & Tailwind component library
+- `src/config/brand.config.ts` — Centralized Servora branding, tagline, and metadata configuration
+- `src/context/restaurant-context` — Central restaurant operational state
+- `src/layouts` — App layouts (`FullLayout` with sidebar, `BlankLayout` for customer ordering)
+- `src/routes/Router.tsx` — Client-side route registration
+- `src/views/customer` — Customer QR menu and live order tracking
+- `src/views/admin` — Orders, menu catalog, tables/QR, staff, analytics, and settings
+- `src/views/kitchen` — Kitchen Display System (KDS)
+- `src/views/superadmin` — Platform overview and tenant directory
+- `src/views/auth` — Login and error pages
 
-## Conventions
+## Quality Checks
 
-- Path alias/component imports follow the existing folder structure under `src/` — check sibling files in `views`/`components` before adding new patterns.
-- Icons: prefer whichever icon set is already used in the file you're editing.
-- Mock data lives in `src/api` and `src/api/mocks` — new features should follow that pattern rather than fetching real endpoints unless one exists.
-- Run `npm run lint` (ESLint, `.eslintrc.cjs` extending `eslint:recommended`, `@typescript-eslint/recommended`, `react-hooks/recommended`) before considering frontend changes done.
-- `npm run build` runs `tsc` first — type errors block the build, not just lint.
-
-## Deployment
-
-- **Netlify**: `netlify.toml` redirects all paths to `/index.html` (SPA fallback) — already configured.
+- `npm run lint`: Runs ESLint with zero tolerance for errors
+- `npm run build`: Typechecks with `tsc` and bundles with Vite (generates `404.html` and `.nojekyll` for GitHub Pages)

@@ -1,21 +1,23 @@
-import { LifeBuoy, BookOpen } from 'lucide-react';
+import { LifeBuoy, Settings } from 'lucide-react';
 import { Link } from 'react-router';
-import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupContent, SidebarGroup } from "@/components/ui/sidebar"
-
+import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupContent, SidebarGroup } from "@/components/ui/sidebar";
+import { BRAND_CONFIG } from 'src/config/brand.config';
 
 export function NavUser() {
     const navItems = [
         {
-            title: "Help Center",
-            url: "https://demos.shadcndashboard.dev/theme-pages/faq",
+            title: "Support",
+            url: `mailto:${BRAND_CONFIG.supportEmail}`,
             icon: LifeBuoy,
+            external: true,
         },
         {
-            title: "Documentation",
-            url: "https://shadcndashboard.dev/docs",
-            icon: BookOpen,
+            title: "Settings",
+            url: "/admin/settings",
+            icon: Settings,
+            external: false,
         },
-    ]
+    ];
 
     return (
         <SidebarGroup className="mt-auto p-0">

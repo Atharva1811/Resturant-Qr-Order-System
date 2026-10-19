@@ -1,13 +1,14 @@
 /**
- * Central API Client for Sudarshan QR Restaurant SaaS
- * Connects frontend components to the Node.js/Express backend with mock fallback.
+ * Central API Client for Servora Restaurant SaaS
+ * Connects frontend components to the Node.js/Express backend.
  */
+import { BRAND_CONFIG } from 'src/config/brand.config';
 
 const rawApiUrl =
   import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.PROD
-    ? 'https://sudarshan-qr-api.onrender.com/api'
+    ? 'https://servora-api.onrender.com/api'
     : 'http://localhost:5000/api');
 
 const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
@@ -27,7 +28,7 @@ class ApiClientError extends Error {
 async function request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  const token = localStorage.getItem('sudarshan_auth_token');
+  const token = localStorage.getItem(BRAND_CONFIG.authTokenKey);
   const headers = new Headers(options.headers || {});
 
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
@@ -70,13 +71,13 @@ export const api = {
         body: JSON.stringify({ email, password }),
       });
       if (res?.token) {
-        localStorage.setItem('sudarshan_auth_token', res.token);
+        localStorage.setItem(BRAND_CONFIG.authTokenKey, res.token);
       }
       return res;
     },
     getMe: () => request('/auth/me'),
     logout: () => {
-      localStorage.removeItem('sudarshan_auth_token');
+      localStorage.removeItem(BRAND_CONFIG.authTokenKey);
     },
   },
 

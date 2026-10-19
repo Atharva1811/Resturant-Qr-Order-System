@@ -115,7 +115,7 @@ export class BrevoService {
           </div>
           <p style="color: #64748b; font-size: 13px;">This code will expire in <strong>5 minutes</strong>. If you did not request this code, you can safely ignore this email.</p>
           <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
-          <p style="color: #94a3b8; font-size: 12px; text-align: center;">Powered by Sudarshan QR Restaurant System</p>
+          <p style="color: #94a3b8; font-size: 12px; text-align: center;">Powered by Servora — Restaurant Ordering, Simplified</p>
         </div>
       `;
 

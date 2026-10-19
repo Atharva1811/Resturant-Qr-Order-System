@@ -54,7 +54,7 @@ export const createApp = (): Application => {
     res.json({
       status: 'UP',
       timestamp: new Date().toISOString(),
-      service: 'Sudarshan QR Backend',
+      service: 'Servora QR Backend',
       version: '1.0.0',
     });
   };

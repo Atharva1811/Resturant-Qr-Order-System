@@ -1,4 +1,4 @@
-name: Deploy Sudarshan to GitHub Pages
+name: Deploy Servora to GitHub Pages
 
 on:
   push:
@@ -72,8 +72,8 @@ jobs:
         working-directory: shadcndashboard-main
         env:
           VITE_BASE_PATH: /Resturant-Qr-Order-System/
-          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://sudarshan-restaurant-server.onrender.com/api' }}
-          VITE_SOCKET_URL: ${{ secrets.VITE_SOCKET_URL || 'https://sudarshan-restaurant-server.onrender.com' }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://servora-restaurant-server.onrender.com/api' }}
+          VITE_SOCKET_URL: ${{ secrets.VITE_SOCKET_URL || 'https://servora-restaurant-server.onrender.com' }}
         run: |
           npm run build
           # Ensure .nojekyll exists so GitHub Pages serves raw assets and directories
