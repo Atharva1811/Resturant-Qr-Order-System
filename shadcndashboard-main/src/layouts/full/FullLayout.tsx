@@ -6,6 +6,8 @@ import { cn } from 'src/lib/utils';
 import Footer from './shared/footer/Footer';
 import { Outlet } from 'react-router';
 
+import TestModeBanner from 'src/components/shared/TestModeBanner';
+
 const FullLayout: FC = () => {
 
   return (
@@ -17,6 +19,9 @@ const FullLayout: FC = () => {
         <Sidebar />
      
       <SidebarInset className="outline outline-border m-2 rounded-none! overflow-hidden">
+        {/* Test Mode / Backend Offline Warning Banner */}
+        <TestModeBanner />
+
         {/* Top Header  */}
        <Header /> 
         

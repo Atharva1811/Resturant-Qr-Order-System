@@ -1,36 +1,68 @@
 import { io, Socket } from 'socket.io-client';
 import { BRAND_CONFIG } from 'src/config/brand.config';
+import { isTestMode } from 'src/config/api.config';
 
-const rawSocketUrl =
-  import.meta.env.VITE_SOCKET_URL ||
-  (import.meta.env.VITE_API_URL
-    ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
-    : import.meta.env.PROD
-    ? 'https://servora-api.onrender.com'
-    : 'http://localhost:5000');
+function resolveSocketUrl(): string {
+  const envSocket = (import.meta.env.VITE_SOCKET_URL || '').trim();
+  if (envSocket) return envSocket.replace(/\/+$/, '');
 
-const SOCKET_SERVER_URL = rawSocketUrl.replace(/\/+$/, '');
+  const envApi = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').trim();
+  if (envApi) return envApi.replace(/\/api\/?$/, '');
+
+  if (import.meta.env.DEV) {
+    return 'http://localhost:5000';
+  }
+
+  return '';
+}
+
+const SOCKET_SERVER_URL = resolveSocketUrl();
 
 let socket: Socket | null = null;
 
+// Safe no-op dummy socket for Test Mode or when backend is unconfigured
+const dummySocket = {
+  on: () => dummySocket,
+  off: () => dummySocket,
+  emit: () => dummySocket,
+  connect: () => dummySocket,
+  disconnect: () => dummySocket,
+  connected: false,
+} as unknown as Socket;
+
 export const getSocket = (): Socket => {
+  // If in Test Mode or no socket server is configured, return dummy stub
+  if (isTestMode() || !SOCKET_SERVER_URL) {
+    return dummySocket;
+  }
+
   if (!socket) {
     const token = localStorage.getItem(BRAND_CONFIG.authTokenKey);
-    socket = io(SOCKET_SERVER_URL, {
-      auth: { token },
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
+    try {
+      socket = io(SOCKET_SERVER_URL, {
+        auth: { token },
+        autoConnect: true,
+        reconnection: true,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 2000,
+      });
 
-    socket.on('connect', () => {
-      console.log('⚡ Connected to Servora Real-time Socket Server');
-    });
+      socket.on('connect', () => {
+        console.log('⚡ Connected to Servora Real-time Socket Server');
+      });
 
-    socket.on('disconnect', (reason) => {
-      console.log('⚡ Disconnected from Socket Server:', reason);
-    });
+      socket.on('disconnect', (reason) => {
+        console.log('⚡ Disconnected from Socket Server:', reason);
+      });
+
+      socket.on('connect_error', (err) => {
+        // Suppress unhandled noisy errors in standalone frontend mode
+        console.warn('⚡ Socket connection notice:', err.message);
+      });
+    } catch (err) {
+      console.warn('⚡ Socket initialization skipped:', err);
+      return dummySocket;
+    }
   }
 
   return socket;
@@ -99,4 +131,3 @@ export const onSocketDisconnect = (callback: (reason: string) => void): (() => v
     s.off('disconnect', callback);
   };
 };
-

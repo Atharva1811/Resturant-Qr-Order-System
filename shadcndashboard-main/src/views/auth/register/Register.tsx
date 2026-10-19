@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BRAND_CONFIG } from 'src/config/brand.config';
+import { isTestMode } from 'src/config/api.config';
+import { Badge } from 'src/components/ui/badge';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -99,7 +101,11 @@ export default function Register() {
         setCurrentRestaurantSlug(user.restaurantSlug);
       }
 
-      toast.success(`Welcome to Servora, ${user.restaurantName || restaurantName}!`);
+      if ((user as any)?.isTestMode) {
+        toast.info(`Test Mode Preview: Validated form input successfully. (Record NOT saved to database — backend is offline).`);
+      } else {
+        toast.success(`Welcome to Servora, ${user.restaurantName || restaurantName}!`);
+      }
       await refreshData().catch(() => {});
 
       // Navigate straight to newly created restaurant admin dashboard
@@ -135,6 +141,19 @@ export default function Register() {
         </div>
 
         <CardContent className="p-7 space-y-6">
+          {isTestMode() && (
+            <div className="rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 p-3 text-xs text-amber-900 dark:text-amber-200">
+              <div className="font-bold flex items-center gap-1.5 mb-1">
+                <Badge variant="outline" className="bg-amber-200/60 text-amber-900 dark:text-amber-200 text-[10px] px-1.5 py-0 border-amber-400">
+                  TEST PREVIEW ONLY
+                </Badge>
+                <span>No Backend Persistence</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                Frontend Test Mode is active. Registration previews validation in-memory only. No account or restaurant record will be saved to PostgreSQL, and no welcome email will be dispatched.
+              </p>
+            </div>
+          )}
           {errorMessage && (
             <Alert variant="destructive" className="py-2.5 px-3 text-xs flex items-center gap-2">
               <AlertCircle className="size-4 shrink-0" />

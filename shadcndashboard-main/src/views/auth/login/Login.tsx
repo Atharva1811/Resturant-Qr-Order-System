@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from 'src/components/ui/alert';
 import { UtensilsCrossed, Lock, Mail, Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { BRAND_CONFIG } from 'src/config/brand.config';
+import { isTestMode } from 'src/config/api.config';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -53,7 +54,11 @@ export default function Login() {
         setCurrentRestaurantSlug(user.restaurantSlug);
       }
 
-      toast.success(`Welcome back, ${user.name || 'User'}!`);
+      if (user.isTestMode) {
+        toast.info(`Test Mode Preview: Entering as ${user.role} (No real credentials checked).`);
+      } else {
+        toast.success(`Welcome back, ${user.name || 'User'}!`);
+      }
 
       // Authoritative redirection based on verified server role
       switch (user.role) {
@@ -178,6 +183,74 @@ export default function Login() {
               )}
             </Button>
           </form>
+
+          {isTestMode() && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-left">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                  🧪 Test Mode: Explore Roles Offline
+                </span>
+                <span className="text-[10px] text-muted-foreground font-mono">Preview only</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Backend is offline. You can preview each dashboard layout directly:
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setActiveRole('RESTAURANT_ADMIN');
+                    toast.info('Previewing as Restaurant Admin (Test Mode)');
+                    navigate('/admin/dashboard');
+                  }}
+                  className="h-7 text-[11px] font-semibold"
+                >
+                  Admin Dashboard
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setActiveRole('KITCHEN_STAFF');
+                    toast.info('Previewing as Kitchen Staff (Test Mode)');
+                    navigate('/kitchen/orders');
+                  }}
+                  className="h-7 text-[11px] font-semibold"
+                >
+                  Kitchen KDS
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setActiveRole('CUSTOMER');
+                    toast.info('Previewing Customer Ordering (Test Mode)');
+                    navigate('/m/rustic-hearth/table-1?token=test_token_t01_abcdef1234567890&testMode=true');
+                  }}
+                  className="h-7 text-[11px] font-semibold"
+                >
+                  Customer Ordering
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setActiveRole('SUPERADMIN');
+                    toast.info('Previewing as Superadmin (Test Mode)');
+                    navigate('/superadmin');
+                  }}
+                  className="h-7 text-[11px] font-semibold"
+                >
+                  Superadmin
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="pt-3 text-center border-t border-border/60 space-y-1.5">
             <p className="text-xs text-muted-foreground">

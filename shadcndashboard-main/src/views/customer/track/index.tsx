@@ -213,6 +213,18 @@ export default function CustomerOrderTrackingPage() {
           </div>
         </div>
 
+        {/* Test Mode Preview Notice */}
+        {(order.isTestMode || order.notice) && (
+          <div className="mx-4 mt-3 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200">
+            <p className="font-bold flex items-center gap-1.5">
+              <span>🧪 Test Mode Order Preview</span>
+            </p>
+            <p className="mt-0.5 text-stone-600 dark:text-stone-300">
+              This order was placed in Frontend Test Mode and is stored in browser memory only. No real charges or database records were created.
+            </p>
+          </div>
+        )}
+
         {/* Status Stepper */}
         <div className="p-6 bg-card border-b border-border">
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">

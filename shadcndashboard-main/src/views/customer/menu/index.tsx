@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router';
 import api from 'src/api/api-client';
 import { BRAND_CONFIG } from 'src/config/brand.config';
+import { isTestMode } from 'src/config/api.config';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import { MenuItem, CustomizationGroup, SelectedCustomization, OrderItem } from 'src/context/restaurant-context/types';
 import { Input } from 'src/components/ui/input';
@@ -368,7 +369,7 @@ export default function CustomerMenuPage() {
             {tableVerified === true ? (
               <Badge variant="outline" className="bg-emerald-950/60 text-emerald-300 border-emerald-500/30 backdrop-blur-md text-[11px] py-1 flex items-center gap-1">
                 <ShieldCheck className="size-3 text-emerald-400" />
-                <span>Verified Stand</span>
+                <span>{isTestMode() ? 'Verified Stand (Test Mode)' : 'Verified Stand'}</span>
               </Badge>
             ) : tableVerified === false ? (
               <Badge variant="outline" className="bg-rose-950/60 text-rose-300 border-rose-500/30 backdrop-blur-md text-[11px] py-1 flex items-center gap-1">
@@ -388,6 +389,18 @@ export default function CustomerMenuPage() {
             <p className="text-xs text-stone-200 mt-0.5 line-clamp-1">{currentRestaurant.cuisine}</p>
           </div>
         </div>
+
+        {/* Test Mode Customer Notice */}
+        {isTestMode() && (
+          <div className="mx-4 mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-amber-800 dark:text-amber-200">
+            <span className="flex items-center gap-2 font-medium">
+              <Badge variant="outline" className="text-[10px] bg-amber-500/20 border-amber-500/40 px-1.5 py-0 text-amber-700 dark:text-amber-300">
+                PREVIEW MODE
+              </Badge>
+              Offline ordering test — orders are handled in-memory only.
+            </span>
+          </div>
+        )}
 
         {/* Verification Warning Alert */}
         {tableError && (
