@@ -266,12 +266,7 @@ export default function CustomerMenuPage() {
       })
       .catch((err) => {
         setIsOtpSending(false);
-        if (err.status && err.status !== 0) {
-          toast.error(err.message || 'Failed to request verification code.');
-          return;
-        }
-        setCheckoutStep('OTP');
-        toast.info(err.message || 'Offline preview mode: enter code to continue.');
+        toast.error(err.message || 'Failed to request verification code. Please try again.');
       });
   };
 
@@ -293,12 +288,7 @@ export default function CustomerMenuPage() {
       })
       .catch((err) => {
         setIsSubmitting(false);
-        if (err.status && err.status !== 0) {
-          toast.error(err.message || 'Verification failed. Please check the code.');
-          return;
-        }
-        toast.warning('Backend unreachable. Continuing in offline preview mode.');
-        setCheckoutStep('PAYMENT');
+        toast.error(err.message || 'Verification failed. Please check your 6-digit code.');
       });
   };
 
@@ -344,30 +334,9 @@ export default function CustomerMenuPage() {
       }
       navigate(`/m/${currentRestaurant.slug}/${table || 'table-4'}/track/${serverOrder.id}`);
     } catch (err: any) {
-      console.warn('Backend order placement error, evaluating fallback:', err);
-      // Fallback if backend network is unreachable during offline testing
-      if (!err.status || err.status === 0) {
-        const order = createCustomerOrder({
-          restaurantSlug: currentRestaurant.slug,
-          tableNumber: formattedTable,
-          customerName: customerName.trim(),
-          customerEmail: customerEmail.trim(),
-          items: cart,
-          subtotal: cartSubtotal,
-          tax: cartTax,
-          total: cartTotal,
-          paymentMethod: paymentMethod,
-          notes: 'Placed via Mobile QR Scan (Offline Store)',
-        });
-        setIsSubmitting(false);
-        setIsCheckoutOpen(false);
-        setIsCartOpen(false);
-        toast.success(`Order ${order.orderNumber} placed in offline store!`);
-        navigate(`/m/${currentRestaurant.slug}/${table || 'table-4'}/track/${order.id}`);
-      } else {
-        setIsSubmitting(false);
-        toast.error(err.message || 'Failed to place order. Please review your selections.');
-      }
+      console.error('Backend order placement error:', err);
+      setIsSubmitting(false);
+      toast.error(err.message || 'Failed to place order with kitchen. Please check connection and try again.');
     }
   };
 

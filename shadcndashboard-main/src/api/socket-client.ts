@@ -1,6 +1,14 @@
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_SERVER_URL = (import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000').replace(/\/+$/, '');
+const rawSocketUrl =
+  import.meta.env.VITE_SOCKET_URL ||
+  (import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+    : import.meta.env.PROD
+    ? 'https://sudarshan-qr-api.onrender.com'
+    : 'http://localhost:5000');
+
+const SOCKET_SERVER_URL = rawSocketUrl.replace(/\/+$/, '');
 
 let socket: Socket | null = null;
 

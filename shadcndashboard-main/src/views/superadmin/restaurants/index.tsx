@@ -85,32 +85,36 @@ export default function SuperadminRestaurants() {
     setSelectedTenantForAction(null);
   };
 
-  const handleCreateRestaurant = (e: React.FormEvent) => {
+  const handleCreateRestaurant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newSlug.trim()) {
       toast.error('Restaurant name and slug are required.');
       return;
     }
 
-    const created = addRestaurant({
-      name: newName.trim(),
-      slug: newSlug.trim().toLowerCase().replace(/\s+/g, '-'),
-      cuisine: newCuisine.trim() || 'Modern Cuisine',
-      address: newAddress.trim() || '100 Main St, Cityville',
-      phone: newPhone.trim() || '+1 (555) 000-0000',
-      email: newEmail.trim() || `contact@${newSlug}.com`,
-      logoUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=150&auto=format&fit=crop&q=80',
-      bannerUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80',
-      currency: '$',
-      taxRate: 8.5,
-      status: 'ACTIVE',
-    });
+    try {
+      const created = await addRestaurant({
+        name: newName.trim(),
+        slug: newSlug.trim().toLowerCase().replace(/\s+/g, '-'),
+        cuisine: newCuisine.trim() || 'Modern Cuisine',
+        address: newAddress.trim() || '100 Main St, Cityville',
+        phone: newPhone.trim() || '+1 (555) 000-0000',
+        email: newEmail.trim() || `contact@${newSlug}.com`,
+        logoUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=150&auto=format&fit=crop&q=80',
+        bannerUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80',
+        currency: '$',
+        taxRate: 8.5,
+        status: 'ACTIVE',
+      });
 
-    toast.success(`Partner restaurant "${created.name}" onboarded successfully!`);
-    setIsAddOpen(false);
-    setNewName('');
-    setNewSlug('');
-    setNewCuisine('');
+      toast.success(`Partner restaurant "${created.name}" onboarded successfully!`);
+      setIsAddOpen(false);
+      setNewName('');
+      setNewSlug('');
+      setNewCuisine('');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to onboard restaurant on server.');
+    }
   };
 
   return (

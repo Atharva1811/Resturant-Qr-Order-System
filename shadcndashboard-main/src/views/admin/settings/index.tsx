@@ -26,7 +26,7 @@ export default function RestaurantAdminSettings() {
   const [currency, setCurrency] = useState(currentRestaurant.currency);
   const [taxRate, setTaxRate] = useState(currentRestaurant.taxRate.toString());
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsedTax = parseFloat(taxRate);
     if (!name.trim() || isNaN(parsedTax) || parsedTax < 0) {
@@ -34,17 +34,19 @@ export default function RestaurantAdminSettings() {
       return;
     }
 
-    updateRestaurantSettings({
-      name: name.trim(),
-      cuisine: cuisine.trim(),
-      address: address.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      currency: currency.trim() || '$',
-      taxRate: parsedTax,
-    });
-
-    toast.success('Restaurant profile and billing settings updated.');
+    try {
+      await updateRestaurantSettings({
+        name: name.trim(),
+        cuisine: cuisine.trim(),
+        address: address.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        currency: currency.trim() || '$',
+        taxRate: parsedTax,
+      });
+    } catch {
+      // Toast handled by context
+    }
   };
 
   return (
@@ -160,21 +162,7 @@ export default function RestaurantAdminSettings() {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="p-4 border-t border-border bg-muted/20 flex justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                resetToInitialData();
-                toast.success('Reset demo state to initial dataset');
-              }}
-              className="text-xs text-rose-600 hover:text-rose-700 gap-1.5"
-            >
-              <RotateCcw className="size-3.5" />
-              <span>Reset Demo State</span>
-            </Button>
-
+          <CardFooter className="p-4 border-t border-border bg-muted/20 flex justify-end">
             <Button type="submit" size="sm" className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold">
               Save Settings
             </Button>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import api from 'src/api/api-client';
@@ -30,7 +30,7 @@ export default function CustomerOrderTrackingPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const fetchOrder = async () => {
+  const fetchOrder = useCallback(async () => {
     if (!orderId) {
       setIsLoading(false);
       return;
@@ -51,11 +51,11 @@ export default function CustomerOrderTrackingPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [orderId, orders]);
 
   useEffect(() => {
     fetchOrder();
-  }, [orderId]);
+  }, [fetchOrder]);
 
   // Flash animation on status change
   useEffect(() => {

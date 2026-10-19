@@ -49,6 +49,7 @@ export interface TableItem {
   capacity: number;
   status: 'AVAILABLE' | 'OCCUPIED' | 'RESERVED';
   qrCodeUrl?: string;
+  qrToken?: string;
 }
 
 export interface SelectedCustomization {

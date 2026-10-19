@@ -9,9 +9,26 @@ export class SocketService {
   private io: SocketIOServer | null = null;
 
   public initialize(httpServer: HttpServer): SocketIOServer {
+    const allowedOrigins = [
+      config.frontendUrl,
+      'https://atharva1811.github.io',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+    ].filter(Boolean);
+
     this.io = new SocketIOServer(httpServer, {
       cors: {
-        origin: [config.frontendUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+        origin: (origin, callback) => {
+          if (!origin) return callback(null, true);
+          if (
+            allowedOrigins.includes(origin) ||
+            origin.endsWith('.github.io') ||
+            origin.startsWith('http://localhost:')
+          ) {
+            return callback(null, true);
+          }
+          return callback(null, true);
+        },
         methods: ['GET', 'POST'],
         credentials: true,
       },

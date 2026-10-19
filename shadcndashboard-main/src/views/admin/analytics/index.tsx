@@ -5,12 +5,12 @@ import { Badge } from 'src/components/ui/badge';
 import { Button } from 'src/components/ui/button';
 import {
   BarChart3,
-  Calendar,
   TrendingUp,
   DollarSign,
   ShoppingBag,
-  Sparkles,
   Award,
+  Inbox,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -29,7 +29,9 @@ export default function RestaurantAdminAnalytics() {
   const [timeRange, setTimeRange] = useState<'TODAY' | 'WEEK' | 'MONTH'>('WEEK');
   const [renderTime] = useState(() => Date.now());
 
-  const restaurantOrders = orders.filter((o) => o.restaurantSlug === currentRestaurant.slug);
+  const restaurantOrders = orders.filter(
+    (o) => !o.restaurantSlug || o.restaurantSlug === currentRestaurant.slug
+  );
 
   const filteredOrders = restaurantOrders.filter((order) => {
     if (timeRange === 'TODAY') {
@@ -51,104 +53,50 @@ export default function RestaurantAdminAnalytics() {
   const hasLiveOrders = filteredOrders.length > 0;
   const currency = currentRestaurant.currency || '$';
 
-  // Live or baseline figures
-  const periodRevenue = hasLiveOrders
-    ? filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0)
-    : timeRange === 'TODAY'
-    ? 1240.0
-    : timeRange === 'WEEK'
-    ? 8160.0
-    : 34500.0;
-
-  const periodOrdersCount = hasLiveOrders
-    ? filteredOrders.length
-    : timeRange === 'TODAY'
-    ? 42
-    : timeRange === 'WEEK'
-    ? 268
-    : 1140;
-
+  // Derived real figures
+  const periodRevenue = filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+  const periodOrdersCount = filteredOrders.length;
   const periodAov = periodOrdersCount > 0 ? periodRevenue / periodOrdersCount : 0;
-  const completedOrders = hasLiveOrders
-    ? filteredOrders.filter((o) => o.status === 'COMPLETED').length
-    : Math.round(periodOrdersCount * 0.94);
-  const completionRate = periodOrdersCount > 0 ? Math.round((completedOrders / periodOrdersCount) * 100) : 95;
+  const completedOrders = filteredOrders.filter((o) => o.status === 'COMPLETED').length;
+  const completionRate =
+    periodOrdersCount > 0 ? Math.round((completedOrders / periodOrdersCount) * 100) : 0;
 
-  const weekSalesData = [
-    { day: 'Mon', revenue: hasLiveOrders ? Math.round(periodRevenue * 0.08) : 640, orders: hasLiveOrders ? Math.max(1, Math.round(periodOrdersCount * 0.08)) : 21 },
-    { day: 'Tue', revenue: hasLiveOrders ? Math.round(periodRevenue * 0.10) : 780, orders: hasLiveOrders ? Math.max(1, Math.round(periodOrdersCount * 0.10)) : 26 },
-    { day: 'Wed', revenue: hasLiveOrders ? Math.round(periodRevenue * 0.12) : 920, orders: hasLiveOrders ? Math.max(1, Math.round(periodOrdersCount * 0.12)) : 31 },
-    { day: 'Thu', revenue: hasLiveOrders ? Math.round(periodRevenue * 0.11) : 860, orders: hasLiveOrders ? Math.max(1, Math.round(periodOrdersCount * 0.11)) : 28 },
-    { day: 'Fri', revenue: hasLiveOrders ? Math.round(periodRevenue * 0.18) : 1420, orders: hasLiveOrders ? Math.max(1, Math.round(periodOrdersCount * 0.18)) : 46 },
-    { day: 'Sat', revenue: hasLiveOrders ? Math.round(periodRevenue * 0.23) : 1890, orders: hasLiveOrders ? Math.max(1, Math.round(periodOrdersCount * 0.23)) : 62 },
-    { day: 'Sun', revenue: hasLiveOrders ? Math.round(periodRevenue * 0.18) : 1650, orders: hasLiveOrders ? Math.max(1, Math.round(periodOrdersCount * 0.18)) : 54 },
-  ];
-
-  // Derive top popular dishes from live orders if present
-  const dishCounts: Record<string, { count: number; revenue: number }> = {};
-  if (hasLiveOrders) {
-    filteredOrders.forEach((o) => {
-      (o.items || []).forEach((item) => {
-        const name = item.name || 'Dish';
-        if (!dishCounts[name]) {
-          dishCounts[name] = { count: 0, revenue: 0 };
-        }
-        dishCounts[name].count += item.quantity || 1;
-        dishCounts[name].revenue += item.itemTotal ?? ((item.price || 0) * (item.quantity || 1));
-      });
-    });
+  // Real daily aggregation for charts
+  const dayMap = new Map<string, { day: string; revenue: number; orders: number }>();
+  for (const o of filteredOrders) {
+    const d = new Date(o.createdAt);
+    const dayLabel = d.toLocaleDateString([], { weekday: 'short' });
+    const existing = dayMap.get(dayLabel) || { day: dayLabel, revenue: 0, orders: 0 };
+    existing.revenue = Number((existing.revenue + o.total).toFixed(2));
+    existing.orders += 1;
+    dayMap.set(dayLabel, existing);
   }
+  const weekSalesData = Array.from(dayMap.values());
 
-  const livePopularDishes = Object.entries(dishCounts)
+  // Derive top popular dishes from real order line items
+  const dishCounts: Record<string, { count: number; revenue: number }> = {};
+  filteredOrders.forEach((o) => {
+    (o.items || []).forEach((item) => {
+      const name = item.name || 'Dish';
+      if (!dishCounts[name]) {
+        dishCounts[name] = { count: 0, revenue: 0 };
+      }
+      dishCounts[name].count += item.quantity || 1;
+      dishCounts[name].revenue += item.itemTotal ?? (item.price || 0) * (item.quantity || 1);
+    });
+  });
+
+  const popularDishes = Object.entries(dishCounts)
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 5)
-    .map(([name, data], idx) => ({
+    .map(([name, data]) => ({
       name,
       ordersCount: data.count,
       revenue: data.revenue,
-      growth: `+${20 - idx * 2}%`,
     }));
-
-  const popularDishes = livePopularDishes.length > 0 ? livePopularDishes : [
-    { name: 'Margherita D.O.P. Pizza', ordersCount: 142, revenue: 2556.0, growth: '+22%' },
-    { name: 'Slow-Braised Short Rib Pappardelle', ordersCount: 118, revenue: 2832.0, growth: '+18%' },
-    { name: 'Diavola & Hot Honey Pizza', ordersCount: 96, revenue: 2064.0, growth: '+15%' },
-    { name: 'Truffle Burrata & Wild Mushrooms', ordersCount: 84, revenue: 1386.0, growth: '+9%' },
-    { name: 'Blood Orange Basil Spritz', ordersCount: 164, revenue: 1394.0, growth: '+29%' },
-  ];
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Live / Simulated Banner */}
-      {hasLiveOrders ? (
-        <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-xl p-3 flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-200 shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span>
-              <strong>Live Telemetry:</strong> Aggregating {filteredOrders.length} active customer orders in real-time.
-            </span>
-          </div>
-          <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
-            Live Stream
-          </Badge>
-        </div>
-      ) : (
-        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-amber-600 shrink-0" />
-            <span>
-              <strong>Simulated Baseline:</strong> Sample reporting data displayed. Real-time metrics update automatically as customer QR orders are placed.
-            </span>
-          </div>
-          <Badge variant="outline" className="border-amber-300 text-[10px] text-amber-800 dark:text-amber-200">
-            Preview Baseline
-          </Badge>
-        </div>
-      )}
-
       {/* Header with Date Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -157,7 +105,7 @@ export default function RestaurantAdminAnalytics() {
             <span>Restaurant Analytics</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Performance metrics, sales velocity, and customer dish preferences for {currentRestaurant.name}
+            Verified performance metrics, sales velocity, and customer dish preferences for {currentRestaurant.name}
           </p>
         </div>
 
@@ -199,153 +147,200 @@ export default function RestaurantAdminAnalytics() {
                 <DollarSign className="size-4" />
               </div>
             </div>
-            <div className="mt-2 flex items-baseline justify-between">
+            <div className="mt-3">
               <span className="text-2xl font-black text-foreground">
                 {currency}
                 {periodRevenue.toFixed(2)}
               </span>
-              <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5">
-                <TrendingUp className="size-3" /> +14.2%
-              </span>
+              <p className="text-[11px] text-muted-foreground mt-1">Verified gross sales</p>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-1">Gross sales generated via QR ordering</p>
           </CardContent>
         </Card>
 
         <Card className="border border-border shadow-xs">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">Total Period Orders</span>
+              <span className="text-xs font-semibold text-muted-foreground">Total Orders</span>
               <div className="size-8 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
                 <ShoppingBag className="size-4" />
               </div>
             </div>
-            <div className="mt-2 flex items-baseline justify-between">
+            <div className="mt-3">
               <span className="text-2xl font-black text-foreground">{periodOrdersCount}</span>
-              <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5">
-                <TrendingUp className="size-3" /> +8.9%
-              </span>
+              <p className="text-[11px] text-muted-foreground mt-1">Orders submitted</p>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-1">Kitchen & dining room tickets</p>
           </CardContent>
         </Card>
 
         <Card className="border border-border shadow-xs">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">Average Order Value (AOV)</span>
-              <div className="size-8 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
-                <BarChart3 className="size-4" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-2xl font-black text-foreground">
-                {currency}
-                {periodAov.toFixed(2)}
-              </span>
-              <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5">
-                <TrendingUp className="size-3" /> +$2.10
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-1">Driven by beverage & dessert add-ons</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-border shadow-xs">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">Order Completion Rate</span>
+              <span className="text-xs font-semibold text-muted-foreground">Avg. Ticket Size</span>
               <div className="size-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
                 <TrendingUp className="size-4" />
               </div>
             </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-2xl font-black text-foreground">{completionRate}%</span>
-              <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5">
-                <TrendingUp className="size-3" /> On Target
+            <div className="mt-3">
+              <span className="text-2xl font-black text-foreground">
+                {currency}
+                {periodAov.toFixed(2)}
               </span>
+              <p className="text-[11px] text-muted-foreground mt-1">Average per customer</p>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-1">Successfully fulfilled by kitchen</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border shadow-xs">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground">Fulfillment Rate</span>
+              <div className="size-8 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                <CheckCircle2 className="size-4" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-foreground">{completionRate}%</span>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {completedOrders} completed tickets
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Revenue Trend Chart */}
-      <Card className="border border-border shadow-xs">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-bold text-foreground">Revenue Trend</CardTitle>
-              <p className="text-xs text-muted-foreground">Daily sales velocity over the selected window</p>
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Sales Trend Chart */}
+        <Card className="lg:col-span-8 border border-border shadow-xs">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-bold text-foreground">Revenue Trend</CardTitle>
+                <p className="text-xs text-muted-foreground">Daily sales velocity across the selected timeframe</p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                Verified Orders
+              </Badge>
             </div>
-            <Badge variant="outline" className="text-xs font-semibold">
-              {timeRange === 'TODAY' ? 'Hourly View' : timeRange === 'WEEK' ? '7-Day Aggregate' : '30-Day Aggregate'}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className="h-[280px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={weekSalesData}>
-                <defs>
-                  <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#d97706" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#d97706" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                <XAxis dataKey="day" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis
-                  stroke="#888888"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(val) => `${currency}${val}`}
-                />
-                <Tooltip
-                  formatter={(val: any) => [`${currency}${val}`, 'Sales']}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #ccc', fontSize: '12px' }}
-                />
-                <Area type="monotone" dataKey="revenue" stroke="#d97706" strokeWidth={2.5} fillOpacity={1} fill="url(#salesGrad)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="h-[270px] w-full flex items-center justify-center">
+              {weekSalesData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={weekSalesData}>
+                    <defs>
+                      <linearGradient id="amberAnalytics" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
+                    <XAxis dataKey="day" stroke="#888888" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis
+                      stroke="#888888"
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => `$${v}`}
+                    />
+                    <Tooltip
+                      formatter={(val: any) => [`$${val}`, 'Gross Revenue']}
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #ccc', fontSize: '12px' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#f59e0b"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#amberAnalytics)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center text-muted-foreground flex flex-col items-center">
+                  <Inbox className="size-8 text-muted-foreground/40 mb-1.5" />
+                  <p className="text-xs font-semibold">No sales activity for this period</p>
+                  <p className="text-[11px] text-muted-foreground">Orders placed during this range will appear here.</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Order Volume Histogram */}
+        <Card className="lg:col-span-4 border border-border shadow-xs">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold text-foreground">Order Volume</CardTitle>
+            <p className="text-xs text-muted-foreground">Ticket volume distribution</p>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="h-[270px] w-full flex items-center justify-center">
+              {weekSalesData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={weekSalesData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
+                    <XAxis dataKey="day" stroke="#888888" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#888888" fontSize={11} tickLine={false} axisLine={false} />
+                    <Tooltip formatter={(val: any) => [val, 'Tickets']} />
+                    <Bar dataKey="orders" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center text-muted-foreground flex flex-col items-center">
+                  <Inbox className="size-8 text-muted-foreground/40 mb-1.5" />
+                  <p className="text-xs font-semibold">No ticket volume recorded</p>
+                  <p className="text-[11px] text-muted-foreground">Ticket counts will reflect here.</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Top Performing Dishes Table */}
       <Card className="border border-border shadow-xs">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-            <Award className="size-4 text-amber-600" />
-            <span>Top Performing Menu Items</span>
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">Most frequently ordered dishes ranked by volume</p>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <div>
+            <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <Award className="size-4 text-amber-600" />
+              <span>Top Ordered Dishes</span>
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Ranked by volume ordered via customer QR tables</p>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="divide-y divide-border/60">
-            {popularDishes.map((dish, idx) => (
-              <div key={idx} className="py-3 flex items-center justify-between text-xs first:pt-0 last:pb-0">
-                <div className="flex items-center gap-3">
-                  <span className="size-6 rounded-md bg-muted flex items-center justify-center font-bold text-muted-foreground text-xs">
-                    #{idx + 1}
-                  </span>
-                  <div>
-                    <p className="font-bold text-sm text-foreground">{dish.name}</p>
-                    <p className="text-muted-foreground">{dish.ordersCount} tickets ordered</p>
+          {popularDishes.length > 0 ? (
+            <div className="divide-y divide-border/60">
+              {popularDishes.map((dish, idx) => (
+                <div key={dish.name} className="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <span className="size-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center font-black text-xs shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground">{dish.name}</h4>
+                      <p className="text-xs text-muted-foreground">{dish.ordersCount} total units sold</p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="font-bold text-sm text-foreground">
+                      {currency}
+                      {dish.revenue.toFixed(2)}
+                    </span>
+                    <p className="text-[11px] text-muted-foreground">Revenue contribution</p>
                   </div>
                 </div>
-
-                <div className="text-right">
-                  <p className="font-bold text-foreground">
-                    {currency}
-                    {dish.revenue.toFixed(2)}
-                  </p>
-                  <p className="text-emerald-600 font-semibold">{dish.growth}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-12 text-center text-muted-foreground flex flex-col items-center justify-center">
+              <Inbox className="size-8 text-muted-foreground/40 mb-1.5" />
+              <p className="text-xs font-semibold">No dish performance records yet</p>
+              <p className="text-[11px] text-muted-foreground">Ordered items will rank here based on customer volume.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

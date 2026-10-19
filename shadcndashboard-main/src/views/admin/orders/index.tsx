@@ -72,11 +72,12 @@ export default function RestaurantAdminOrders() {
     return true;
   });
 
-  const handleUpdateStatus = (newStatus: OrderStatus) => {
+  const handleUpdateStatus = async (newStatus: OrderStatus) => {
     if (!selectedOrder) return;
-    updateOrderStatus(selectedOrder.id, newStatus);
-    setSelectedOrder({ ...selectedOrder, status: newStatus });
-    toast.success(`Order ${selectedOrder.orderNumber} updated to ${newStatus}`);
+    const success = await updateOrderStatus(selectedOrder.id, newStatus);
+    if (success) {
+      setSelectedOrder({ ...selectedOrder, status: newStatus });
+    }
   };
 
   return (

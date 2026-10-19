@@ -46,50 +46,16 @@ export default function SuperadminOverview() {
   const totalPlatformOrders = platformMetrics?.platformOrders ?? restaurants.reduce((acc, r) => acc + r.totalOrders, 0);
   const activeTenants = platformMetrics?.activeTenants ?? restaurants.filter((r) => r.status === 'ACTIVE').length;
 
-  // Monthly platform growth data
-  const growthData = [
-    { month: 'Oct', volume: 18400, orders: 480 },
-    { month: 'Nov', volume: 29500, orders: 740 },
-    { month: 'Dec', volume: 46200, orders: 1120 },
-    { month: 'Jan', volume: 54100, orders: 1390 },
-    { month: 'Feb', volume: 68900, orders: 1820 },
-    { month: 'Mar', volume: 86990, orders: 2620 },
-  ];
-
   const tenantVolumeData = restaurants.map((r) => ({
     name: r.name.length > 15 ? r.name.substring(0, 15) + '...' : r.name,
     revenue: r.totalRevenue,
     orders: r.totalOrders,
   }));
 
+  const growthData = platformMetrics?.monthlyGrowth || tenantVolumeData;
+
   return (
     <div className="space-y-6 pb-20">
-      {/* Platform Status Banner */}
-      {isBackendConnected ? (
-        <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900/60 rounded-xl p-3.5 flex items-center justify-between text-xs text-purple-900 dark:text-purple-200">
-          <div className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-purple-600 animate-pulse"></span>
-            <span>
-              <strong>Platform Superadmin Live Mode:</strong> Connected to PostgreSQL multi-tenant backend with real-time audit event logging.
-            </span>
-          </div>
-          <Badge variant="outline" className="border-purple-300 text-purple-700 dark:text-purple-300 text-[10px] hidden sm:inline">
-            PostgreSQL Multi-Tenant
-          </Badge>
-        </div>
-      ) : (
-        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3.5 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-amber-600 shrink-0" />
-            <span>
-              <strong>Platform Superadmin Demo:</strong> Multi-tenant management enabled in offline resilient mode.
-            </span>
-          </div>
-          <Badge variant="outline" className="border-amber-300 text-[10px] hidden sm:inline">
-            Offline Resilient
-          </Badge>
-        </div>
-      )}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

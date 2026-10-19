@@ -5,7 +5,6 @@ import { SidebarInset, SidebarProvider } from 'src/components/ui/sidebar';
 import { cn } from 'src/lib/utils';
 import Footer from './shared/footer/Footer';
 import { Outlet } from 'react-router';
-import { DemoNavBanner } from 'src/components/shared/DemoNavBanner';
 
 const FullLayout: FC = () => {
 
@@ -30,8 +29,6 @@ const FullLayout: FC = () => {
             </div>
           </div>
         </div>
-        
-        <DemoNavBanner />
       </SidebarInset>
     </SidebarProvider>
   );

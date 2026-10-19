@@ -43,26 +43,28 @@ export default function RestaurantAdminStaff() {
 
   const restaurantStaff = staff.filter((s) => s.restaurantSlug === currentRestaurant.slug);
 
-  const handleAddStaff = (e: React.FormEvent) => {
+  const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) {
       toast.error('Name and email are required.');
       return;
     }
 
-    const created = addStaff({
-      restaurantSlug: currentRestaurant.slug,
-      name: name.trim(),
-      email: email.trim(),
-      role: role,
-      status: 'ACTIVE',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-    });
-
-    toast.success(`Staff member "${created.name}" invited.`);
-    setIsAddOpen(false);
-    setName('');
-    setEmail('');
+    try {
+      await addStaff({
+        restaurantSlug: currentRestaurant.slug,
+        name: name.trim(),
+        email: email.trim(),
+        role: role,
+        status: 'ACTIVE',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      });
+      setIsAddOpen(false);
+      setName('');
+      setEmail('');
+    } catch {
+      // Toast handled by context
+    }
   };
 
   const getRoleBadge = (role: string) => {

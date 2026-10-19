@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: sudarshan-restaurant-server
+    runtime: node
+    plan: starter
+    rootDir: server
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: FRONTEND_URL
+        value: https://atharva1811.github.io/Resturant-Qr-Order-System
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        value: orders@sudarshanqr.com
+      - key: BREVO_SENDER_NAME
+        value: Sudarshan QR Ordering
+      - key: PAYMENT_WEBHOOK_SECRET
+        generateValue: true

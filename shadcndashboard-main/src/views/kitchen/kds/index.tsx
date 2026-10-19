@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import { Order, OrderStatus } from 'src/context/restaurant-context/types';
 import { onOrderCreated, onSocketConnect } from 'src/api/socket-client';
@@ -31,7 +31,7 @@ export default function KitchenDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Web Audio chime function for action / alert feedback
-  const playChime = () => {
+  const playChime = useCallback(() => {
     if (!soundEnabled) return;
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -49,7 +49,7 @@ export default function KitchenDashboard() {
     } catch {
       // AudioContext unavailable or blocked
     }
-  };
+  }, [soundEnabled]);
 
   // Real-time audio alert when new order arrives via Socket.IO
   useEffect(() => {
@@ -60,10 +60,10 @@ export default function KitchenDashboard() {
       }
     });
     return () => unsub();
-  }, [soundEnabled]);
+  }, [playChime]);
 
   // Fetch active queue and auto-recover on socket reconnect
-  const fetchActiveKitchenOrders = async (quiet = false) => {
+  const fetchActiveKitchenOrders = useCallback(async (quiet = false) => {
     if (!quiet) setIsRefreshing(true);
     try {
       await refreshData();
@@ -73,7 +73,7 @@ export default function KitchenDashboard() {
     } finally {
       if (!quiet) setIsRefreshing(false);
     }
-  };
+  }, [refreshData]);
 
   useEffect(() => {
     fetchActiveKitchenOrders(true);
@@ -82,7 +82,7 @@ export default function KitchenDashboard() {
       toast.info('⚡ Reconnected to server: active orders refreshed');
     });
     return () => unsubConnect();
-  }, []);
+  }, [fetchActiveKitchenOrders]);
 
   // Update timer every 10 seconds for real-time elapsed time calculation
   useEffect(() => {

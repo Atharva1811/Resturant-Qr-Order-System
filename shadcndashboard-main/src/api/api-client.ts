@@ -3,7 +3,14 @@
  * Connects frontend components to the Node.js/Express backend with mock fallback.
  */
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/+$/, '');
+const rawApiUrl =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD
+    ? 'https://sudarshan-qr-api.onrender.com/api'
+    : 'http://localhost:5000/api');
+
+const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
 
 class ApiClientError extends Error {
   public status: number;

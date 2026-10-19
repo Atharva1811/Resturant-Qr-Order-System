@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from 'src/api/api-client';
 import { onOrderCreated, onOrderStatusUpdated, joinRestaurantRoom } from 'src/api/socket-client';
 import {
@@ -13,14 +13,7 @@ import {
   CartItem,
   OrderItem,
 } from './types';
-import {
-  INITIAL_RESTAURANTS,
-  INITIAL_CATEGORIES,
-  INITIAL_MENU_ITEMS,
-  INITIAL_TABLES,
-  INITIAL_STAFF,
-  INITIAL_ORDERS,
-} from './initial-data';
+import { toast } from 'sonner';
 
 interface RestaurantContextType {
   restaurants: Restaurant[];
@@ -46,7 +39,7 @@ interface RestaurantContextType {
   cartItemCount: number;
 
   // Orders
-  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<boolean> | void;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<boolean>;
   createCustomerOrder: (orderPayload: {
     restaurantSlug: string;
     tableNumber: string;
@@ -58,31 +51,33 @@ interface RestaurantContextType {
     total: number;
     paymentMethod: 'COUNTER' | 'ONLINE';
     notes?: string;
-  }) => Order;
+  }) => Promise<any>;
 
   // Admin Menu & Categories
-  addMenuItem: (item: Omit<MenuItem, 'id'>) => MenuItem;
-  updateMenuItem: (id: string, updates: Partial<MenuItem>) => void;
-  deleteMenuItem: (id: string) => void;
-  toggleItemAvailability: (id: string) => void;
-  addCategory: (category: Omit<MenuCategory, 'id'>) => MenuCategory;
-  updateCategory: (id: string, updates: Partial<MenuCategory>) => void;
-  deleteCategory: (id: string) => void;
+  addMenuItem: (item: Omit<MenuItem, 'id'>) => Promise<MenuItem>;
+  updateMenuItem: (id: string, updates: Partial<MenuItem>) => Promise<void>;
+  deleteMenuItem: (id: string) => Promise<void>;
+  toggleItemAvailability: (id: string) => Promise<void>;
+  addCategory: (category: Omit<MenuCategory, 'id'>) => Promise<MenuCategory>;
+  updateCategory: (id: string, updates: Partial<MenuCategory>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 
   // Admin Tables & Staff
-  addTable: (table: Omit<TableItem, 'id'>) => TableItem;
-  updateTable: (id: string, updates: Partial<TableItem>) => void;
-  deleteTable: (id: string) => void;
-  addStaff: (member: Omit<StaffMember, 'id' | 'joinedDate'>) => StaffMember;
-  updateStaff: (id: string, updates: Partial<StaffMember>) => void;
-  deleteStaff: (id: string) => void;
+  addTable: (table: Omit<TableItem, 'id'>) => Promise<TableItem>;
+  updateTable: (id: string, updates: Partial<TableItem>) => Promise<void>;
+  deleteTable: (id: string) => Promise<void>;
+  addStaff: (member: Omit<StaffMember, 'id' | 'joinedDate'>) => Promise<StaffMember>;
+  updateStaff: (id: string, updates: Partial<StaffMember>) => Promise<void>;
+  deleteStaff: (id: string) => Promise<void>;
 
   // Settings
-  updateRestaurantSettings: (updates: Partial<Restaurant>) => void;
+  updateRestaurantSettings: (updates: Partial<Restaurant>) => Promise<void>;
 
   // Superadmin
-  updateRestaurantStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED') => void;
-  addRestaurant: (restaurant: Omit<Restaurant, 'id' | 'createdAt' | 'totalOrders' | 'totalRevenue'>) => Restaurant;
+  updateRestaurantStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED') => Promise<void>;
+  addRestaurant: (
+    restaurant: Omit<Restaurant, 'id' | 'createdAt' | 'totalOrders' | 'totalRevenue'>
+  ) => Promise<Restaurant>;
 
   // Backend Sync Status
   isBackendConnected: boolean;
@@ -92,68 +87,36 @@ interface RestaurantContextType {
   resetToInitialData: () => void;
 }
 
-const STORAGE_KEY = 'qr_restaurant_saas_state_v1';
+const STORAGE_KEY = 'qr_restaurant_saas_state_v2';
+
+const DEFAULT_FALLBACK_RESTAURANT: Restaurant = {
+  id: 'rustic-hearth-tenant',
+  name: 'The Rustic Hearth',
+  slug: 'rustic-hearth',
+  cuisine: 'Artisan Wood-Fired & Italian Bistro',
+  logoUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=150&auto=format&fit=crop&q=80',
+  bannerUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80',
+  address: '452 Mulberry Avenue, Downtown, NY 10012',
+  phone: '+1 (555) 234-5678',
+  email: 'contact@rustichearth.com',
+  currency: '$',
+  taxRate: 8.5,
+  status: 'ACTIVE',
+  totalOrders: 0,
+  totalRevenue: 0,
+  createdAt: new Date().toISOString(),
+};
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined);
 
 export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Try loading from localStorage
-  const [restaurants, setRestaurants] = useState<Restaurant[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_restaurants`);
-      return saved ? JSON.parse(saved) : INITIAL_RESTAURANTS;
-    } catch {
-      return INITIAL_RESTAURANTS;
-    }
-  });
-
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [currentRestaurantSlug, setCurrentRestaurantSlug] = useState<string>('rustic-hearth');
-
-  const [categories, setCategories] = useState<MenuCategory[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_categories`);
-      return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
-    } catch {
-      return INITIAL_CATEGORIES;
-    }
-  });
-
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_menuItems`);
-      return saved ? JSON.parse(saved) : INITIAL_MENU_ITEMS;
-    } catch {
-      return INITIAL_MENU_ITEMS;
-    }
-  });
-
-  const [tables, setTables] = useState<TableItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_tables`);
-      return saved ? JSON.parse(saved) : INITIAL_TABLES;
-    } catch {
-      return INITIAL_TABLES;
-    }
-  });
-
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_orders`);
-      return saved ? JSON.parse(saved) : INITIAL_ORDERS;
-    } catch {
-      return INITIAL_ORDERS;
-    }
-  });
-
-  const [staff, setStaff] = useState<StaffMember[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_staff`);
-      return saved ? JSON.parse(saved) : INITIAL_STAFF;
-    } catch {
-      return INITIAL_STAFF;
-    }
-  });
-
+  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [tables, setTables] = useState<TableItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_cart`);
@@ -166,37 +129,20 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [activeRole, setActiveRole] = useState<Role>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_role`);
-      return (saved as Role) || 'RESTAURANT_ADMIN';
+      return (saved as Role) || 'CUSTOMER';
     } catch {
-      return 'RESTAURANT_ADMIN';
+      return 'CUSTOMER';
     }
   });
 
-  // Sync to localStorage
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_restaurants`, JSON.stringify(restaurants));
-  }, [restaurants]);
+  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(true);
 
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_categories`, JSON.stringify(categories));
-  }, [categories]);
+  const currentRestaurant =
+    restaurants.find((r) => r.slug === currentRestaurantSlug) ||
+    restaurants[0] ||
+    DEFAULT_FALLBACK_RESTAURANT;
 
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_menuItems`, JSON.stringify(menuItems));
-  }, [menuItems]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_tables`, JSON.stringify(tables));
-  }, [tables]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_orders`, JSON.stringify(orders));
-  }, [orders]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_staff`, JSON.stringify(staff));
-  }, [staff]);
-
+  // Persist cart and active role locally
   useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_cart`, JSON.stringify(cart));
   }, [cart]);
@@ -205,49 +151,59 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     localStorage.setItem(`${STORAGE_KEY}_role`, activeRole);
   }, [activeRole]);
 
-  const currentRestaurant =
-    restaurants.find((r) => r.slug === currentRestaurantSlug) || restaurants[0];
-
-  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
-
-  // Synchronize restaurant catalog, tables, staff, and orders from backend
-  const refreshData = async () => {
+  // Synchronize restaurant catalog, tables, staff, and orders from real backend API
+  const refreshData = useCallback(async () => {
     try {
-      const res = await api.public.getRestaurant(currentRestaurantSlug);
+      // 1. Fetch public restaurant profile & menu
+      const res = await api.public.getRestaurant(currentRestaurantSlug).catch((err) => {
+        console.warn('Backend restaurant fetch notice:', err.message);
+        return null;
+      });
+
       if (res) {
         setIsBackendConnected(true);
-        setRestaurants((prev) =>
-          prev.map((r) =>
-            r.slug === currentRestaurantSlug
-              ? {
-                  ...r,
-                  id: res.id,
-                  name: res.name,
-                  cuisine: res.cuisine,
-                  address: res.address,
-                  phone: res.phone,
-                  email: res.email,
-                  currency: res.currency,
-                  taxRate: res.taxRate,
-                }
-              : r
-          )
-        );
+        const mappedRest: Restaurant = {
+          id: res.id,
+          name: res.name,
+          slug: res.slug,
+          cuisine: res.cuisine || 'Restaurant & Cafe',
+          logoUrl: res.logoUrl || DEFAULT_FALLBACK_RESTAURANT.logoUrl,
+          bannerUrl: res.bannerUrl || DEFAULT_FALLBACK_RESTAURANT.bannerUrl,
+          address: res.address || '',
+          phone: res.phone || '',
+          email: res.email || '',
+          currency: res.currency || '$',
+          taxRate: typeof res.taxRate === 'number' ? res.taxRate : 8.5,
+          status: 'ACTIVE',
+          totalOrders: res.totalOrders || 0,
+          totalRevenue: res.totalRevenue || 0,
+          createdAt: res.createdAt || new Date().toISOString(),
+        };
 
-        if (Array.isArray(res.categories) && res.categories.length > 0) {
+        setRestaurants((prev) => {
+          const idx = prev.findIndex((r) => r.slug === currentRestaurantSlug);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = mappedRest;
+            return next;
+          }
+          return [mappedRest, ...prev];
+        });
+
+        if (Array.isArray(res.categories)) {
           setCategories(
             res.categories.map((c: any) => ({
               id: c.id,
               restaurantSlug: currentRestaurantSlug,
               name: c.name,
-              description: c.description,
-              sortOrder: c.sortOrder,
+              description: c.description || '',
+              sortOrder: c.sortOrder || 0,
               icon: c.icon,
             }))
           );
         }
 
-        if (Array.isArray(res.menuItems) && res.menuItems.length > 0) {
+        if (Array.isArray(res.menuItems)) {
           setMenuItems(
             res.menuItems.map((m: any) => ({
               id: m.id,
@@ -256,149 +212,149 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               name: m.name,
               description: m.description,
               price: m.price,
-              imageUrl: m.imageUrl,
-              isAvailable: m.isAvailable,
-              isVeg: m.isVeg,
-              prepTimeMinutes: m.prepTimeMinutes,
-              customizationGroups: m.customizationGroups?.map((g: any) => ({
-                id: g.id,
-                name: g.name,
-                type: g.type,
-                required: g.required,
-                options: g.options?.map((o: any) => ({
-                  id: o.id,
-                  name: o.name,
-                  price: o.price,
-                  isAvailable: o.isAvailable,
-                })) || [],
-              })) || [],
+              imageUrl: m.imageUrl || '',
+              isAvailable: m.isAvailable !== false,
+              isVeg: Boolean(m.isVeg),
+              prepTimeMinutes: m.prepTimeMinutes || 15,
+              customizationGroups: m.customizationGroups || [],
             }))
           );
         }
       }
 
-      // Background sync for admin tables
-      api.admin
-        .getTables()
-        .then((tableRes) => {
-          if (Array.isArray(tableRes) && tableRes.length > 0) {
-            setTables(
-              tableRes.map((t: any) => ({
+      // 2. If authenticated token exists, fetch authorized tenant data
+      const token = localStorage.getItem('sudarshan_auth_token');
+      if (token) {
+        const meRes = await api.auth.getMe().catch(() => null);
+        const user = meRes?.data || meRes;
+        if (user && user.role) {
+          setActiveRole(user.role);
+          if (user.restaurant?.slug) {
+            setCurrentRestaurantSlug(user.restaurant.slug);
+          }
+        }
+
+        // Tables
+        const tableRes = await api.admin.getTables().catch(() => null);
+        const tableData = tableRes?.data || tableRes;
+        if (Array.isArray(tableData)) {
+          setTables(
+            tableData.map((t: any) => ({
+              id: t.id,
+              restaurantSlug: currentRestaurantSlug,
+              tableNumber: t.tableNumber,
+              capacity: t.capacity || 4,
+              status: t.status || 'AVAILABLE',
+              qrToken: t.qrToken,
+            }))
+          );
+        }
+
+        // Staff
+        const staffRes = await api.admin.getStaff().catch(() => null);
+        const staffData = staffRes?.data || staffRes;
+        if (Array.isArray(staffData)) {
+          setStaff(
+            staffData.map((s: any) => ({
+              id: s.id,
+              restaurantSlug: currentRestaurantSlug,
+              name: s.name,
+              email: s.email,
+              role: s.role,
+              status: s.status || 'ACTIVE',
+              avatarUrl: s.avatarUrl,
+              joinedDate: s.joinedDate ? new Date(s.joinedDate).toISOString().split('T')[0] : '',
+            }))
+          );
+        }
+
+        // Admin Orders
+        const orderRes = await api.admin.getOrders().catch(() => null);
+        const orderData = orderRes?.data?.orders || orderRes?.data || orderRes?.orders || orderRes;
+        if (Array.isArray(orderData)) {
+          setOrders(
+            orderData.map((o: any) => ({
+              id: o.id,
+              orderNumber: o.orderNumber,
+              restaurantSlug: currentRestaurantSlug,
+              tableNumber: o.table?.tableNumber || o.tableNumberSnapshot || 'Table',
+              customerName: o.customerName,
+              customerEmail: o.customerEmail,
+              items: o.items?.map((item: any) => ({
+                id: item.id,
+                menuItemId: item.menuItemId,
+                name: item.nameSnapshot || item.name,
+                quantity: item.quantity,
+                price: item.unitPriceSnapshot || item.price,
+                itemTotal: item.itemTotal,
+                selectedCustomizations: item.customizations || [],
+                notes: item.notes,
+              })) || [],
+              subtotal: o.subtotal,
+              tax: o.tax,
+              total: o.total,
+              paymentMethod: o.paymentMethod || 'COUNTER',
+              paymentStatus: o.paymentStatus || 'PENDING',
+              status: o.status,
+              createdAt: o.createdAt,
+              notes: o.notes,
+            }))
+          );
+        }
+
+        // Superadmin Tenants
+        if (user?.role === 'SUPERADMIN') {
+          const tenantsRes = await api.superadmin.getTenants().catch(() => null);
+          const tenantData = tenantsRes?.data || tenantsRes;
+          if (Array.isArray(tenantData)) {
+            setRestaurants(
+              tenantData.map((t: any) => ({
                 id: t.id,
-                restaurantSlug: currentRestaurantSlug,
-                tableNumber: t.tableNumber,
-                capacity: t.capacity,
+                name: t.name,
+                slug: t.slug,
+                cuisine: t.cuisine,
+                logoUrl: t.logoUrl,
+                bannerUrl: t.bannerUrl,
+                address: t.address,
+                phone: t.phone,
+                email: t.email,
+                currency: t.currency || '$',
+                taxRate: t.taxRate || 8.5,
                 status: t.status,
-                qrCodeUrl: t.qrCodeUrl,
+                totalOrders: t.totalOrders || 0,
+                totalRevenue: t.totalRevenue || 0,
+                createdAt: t.createdAt,
               }))
             );
           }
-        })
-        .catch(() => {});
-
-      // Background sync for staff
-      api.admin
-        .getStaff()
-        .then((staffRes) => {
-          if (Array.isArray(staffRes) && staffRes.length > 0) {
-            setStaff(
-              staffRes.map((s: any) => ({
-                id: s.id,
-                restaurantSlug: currentRestaurantSlug,
-                name: s.name,
-                email: s.email,
-                role: s.role,
-                status: s.status,
-                avatarUrl: s.avatarUrl,
-                joinedDate: s.joinedDate ? new Date(s.joinedDate).toISOString().split('T')[0] : '2026-01-01',
-              }))
-            );
-          }
-        })
-        .catch(() => {});
-
-      // Background sync for kitchen active orders
-      api.kitchen
-        .getActiveOrders()
-        .then((kitchenOrders) => {
-          if (Array.isArray(kitchenOrders) && kitchenOrders.length > 0) {
-            setOrders((prev) => {
-              const updated = [...prev];
-              for (const ko of kitchenOrders) {
-                const idx = updated.findIndex((o) => o.id === ko.id || o.orderNumber === ko.orderNumber);
-                const mapped: Order = {
-                  id: ko.id,
-                  orderNumber: ko.orderNumber,
-                  restaurantSlug: currentRestaurantSlug,
-                  tableNumber: ko.table?.tableNumber || ko.tableNumberSnapshot || 'Table',
-                  customerName: ko.customerName,
-                  customerEmail: ko.customerEmail,
-                  items: ko.items?.map((item: any) => ({
-                    id: item.id,
-                    menuItemId: item.menuItemId,
-                    name: item.nameSnapshot || item.name,
-                    quantity: item.quantity,
-                    price: item.priceSnapshot || item.price,
-                    itemTotal: item.itemTotal,
-                    selectedCustomizations: item.customizations?.map((c: any) => ({
-                      groupId: c.id,
-                      groupName: c.groupNameSnapshot || 'Customization',
-                      selectedOptionNames: [c.optionNameSnapshot || c.name || ''],
-                    })) || [],
-                    notes: item.notes,
-                  })) || [],
-                  subtotal: ko.subtotal,
-                  tax: ko.tax,
-                  total: ko.total,
-                  paymentMethod: ko.paymentMethod || 'COUNTER',
-                  paymentStatus: ko.paymentStatus || 'PENDING',
-                  status: ko.status,
-                  createdAt: ko.createdAt,
-                  notes: ko.notes,
-                };
-                if (idx >= 0) {
-                  updated[idx] = mapped;
-                } else {
-                  updated.unshift(mapped);
-                }
-              }
-              return updated;
-            });
-          }
-        })
-        .catch(() => {});
-    } catch {
-      setIsBackendConnected(false);
+        }
+      }
+    } catch (err) {
+      console.warn('Backend sync completed with notices:', err);
     }
-  };
-
-  useEffect(() => {
-    refreshData();
   }, [currentRestaurantSlug]);
 
-  // Socket.IO real-time event listener for live order sync
+  // Initial load
   useEffect(() => {
-    try {
-      if (currentRestaurant?.id) {
-        joinRestaurantRoom(currentRestaurant.id);
-      }
-    } catch {
-      // Ignored if socket unavailable
+    refreshData();
+  }, [refreshData]);
+
+  // Real-time WebSocket connection to restaurant room
+  useEffect(() => {
+    if (currentRestaurant?.id) {
+      joinRestaurantRoom(currentRestaurant.id);
     }
 
     const unsubCreated = onOrderCreated((newOrder) => {
-      if (!newOrder) return;
-      const orderSlug = newOrder.restaurantSlug || newOrder.restaurant?.slug;
-      if (orderSlug === currentRestaurantSlug || !orderSlug) {
+      if (newOrder && newOrder.id) {
         setOrders((prev) => {
-          if (prev.some((o) => o.id === newOrder.id || o.orderNumber === newOrder.orderNumber)) {
-            return prev;
-          }
+          const exists = prev.some((o) => o.id === newOrder.id);
+          if (exists) return prev;
           const mappedOrder: Order = {
             id: newOrder.id,
             orderNumber: newOrder.orderNumber,
-            restaurantSlug: orderSlug || currentRestaurantSlug,
-            tableNumber: newOrder.tableNumberSnapshot || newOrder.table?.tableNumber || 'Counter',
+            restaurantSlug: currentRestaurantSlug,
+            tableNumber: newOrder.tableNumberSnapshot || newOrder.table?.tableNumber || 'Table',
             customerName: newOrder.customerName,
             customerEmail: newOrder.customerEmail,
             items: newOrder.items || [],
@@ -436,7 +392,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const addToCart = (newItem: OrderItem) => {
     setCart((prev) => {
-      // Check if item with exact same customizations exists
       const existingIdx = prev.findIndex(
         (ci) =>
           ci.menuItemId === newItem.menuItemId &&
@@ -487,31 +442,30 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Orders
   const updateOrderStatus = async (orderId: string, status: OrderStatus): Promise<boolean> => {
-    // Optimistic local update
-    setOrders((prev) =>
-      prev.map((ord) => {
-        if (ord.id === orderId) {
-          const updated = { ...ord, status };
-          if (status === 'COMPLETED' && ord.paymentMethod === 'COUNTER') {
-            updated.paymentStatus = 'PAID';
-          }
-          return updated;
-        }
-        return ord;
-      })
-    );
-
-    // Sync with backend API
     try {
       await api.kitchen.updateOrderStatus(orderId, status);
+      setOrders((prev) =>
+        prev.map((ord) => {
+          if (ord.id === orderId) {
+            const updated = { ...ord, status };
+            if (status === 'COMPLETED' && ord.paymentMethod === 'COUNTER') {
+              updated.paymentStatus = 'PAID';
+            }
+            return updated;
+          }
+          return ord;
+        })
+      );
+      toast.success(`Order updated to ${status}`);
       return true;
-    } catch {
-      // Backend may be offline or in mock mode
+    } catch (err: any) {
+      console.error('Failed to update status on server:', err);
+      toast.error(err.message || 'Failed to update order status on server.');
       return false;
     }
   };
 
-  const createCustomerOrder = (payload: {
+  const createCustomerOrder = async (payload: {
     restaurantSlug: string;
     tableNumber: string;
     customerName: string;
@@ -522,302 +476,206 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     total: number;
     paymentMethod: 'COUNTER' | 'ONLINE';
     notes?: string;
-  }): Order => {
-    const nextNum = 1040 + orders.length + 1;
-    const newOrder: Order = {
-      id: `ord-${nextNum}`,
-      orderNumber: `#${nextNum}`,
+  }): Promise<any> => {
+    const res = await api.public.createOrder({
       restaurantSlug: payload.restaurantSlug,
       tableNumber: payload.tableNumber,
       customerName: payload.customerName,
       customerEmail: payload.customerEmail,
-      items: payload.items,
-      subtotal: payload.subtotal,
-      tax: payload.tax,
-      total: payload.total,
       paymentMethod: payload.paymentMethod,
-      paymentStatus: payload.paymentMethod === 'ONLINE' ? 'PAID' : 'PENDING',
-      status: 'NEW',
-      createdAt: new Date().toISOString(),
       notes: payload.notes,
-    };
+      items: payload.items.map((i) => ({
+        menuItemId: i.menuItemId,
+        quantity: i.quantity,
+        notes: i.notes,
+      })),
+    });
 
-    setOrders((prev) => [newOrder, ...prev]);
-    // Also update restaurant totals
-    setRestaurants((prev) =>
-      prev.map((r) =>
-        r.slug === payload.restaurantSlug
-          ? {
-              ...r,
-              totalOrders: r.totalOrders + 1,
-              totalRevenue: Number((r.totalRevenue + payload.total).toFixed(2)),
-            }
-          : r
-      )
-    );
-
-    clearCart();
-
-    // Fire backend order creation with server-side price validation
-    api.public
-      .createOrder({
-        restaurantSlug: payload.restaurantSlug,
-        tableNumber: payload.tableNumber,
-        customerName: payload.customerName,
-        customerEmail: payload.customerEmail,
-        paymentMethod: payload.paymentMethod,
-        notes: payload.notes,
-        items: payload.items.map((i) => ({
-          menuItemId: i.menuItemId,
-          quantity: i.quantity,
-          notes: i.notes,
-        })),
-      })
-      .then((res) => {
-        if (res?.order?.id) {
-          // If server returned a database order ID and number, reconcile local order
-          setOrders((prev) =>
-            prev.map((o) =>
-              o.id === newOrder.id
-                ? {
-                    ...o,
-                    id: res.order.id,
-                    orderNumber: res.order.orderNumber,
-                  }
-                : o
-            )
-          );
-        }
-      })
-      .catch(() => {
-        // Fallback to local optimistic order
-      });
-
-    return newOrder;
+    const order = res?.data?.order || res?.order || res;
+    if (order) {
+      setOrders((prev) => [order, ...prev]);
+    }
+    return res;
   };
 
   // Menu items
-  const addMenuItem = (item: Omit<MenuItem, 'id'>): MenuItem => {
-    const tempId = `item-${Date.now()}`;
+  const addMenuItem = async (item: Omit<MenuItem, 'id'>): Promise<MenuItem> => {
+    const res = await api.admin.createMenuItem({
+      name: item.name,
+      description: item.description,
+      price: item.price,
+      categoryId: item.categoryId,
+      imageUrl: item.imageUrl,
+      isAvailable: item.isAvailable,
+      isVeg: item.isVeg,
+      prepTimeMinutes: item.prepTimeMinutes,
+      customizationGroups: item.customizationGroups,
+    });
+    const created = res?.data || res;
     const newItem: MenuItem = {
       ...item,
-      id: tempId,
+      id: created.id,
+      restaurantSlug: currentRestaurantSlug,
     };
     setMenuItems((prev) => [newItem, ...prev]);
-
-    api.admin
-      .createMenuItem({
-        name: item.name,
-        description: item.description,
-        price: item.price,
-        categoryId: item.categoryId,
-        imageUrl: item.imageUrl,
-        isAvailable: item.isAvailable,
-        isVeg: item.isVeg,
-        prepTimeMinutes: item.prepTimeMinutes,
-        customizationGroups: item.customizationGroups,
-      })
-      .then((res) => {
-        if (res?.data?.id || res?.id) {
-          const realId = res?.data?.id || res?.id;
-          setMenuItems((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: realId } : m)));
-        }
-      })
-      .catch(() => {});
-
+    toast.success(`Item "${item.name}" added successfully`);
     return newItem;
   };
 
-  const updateMenuItem = (id: string, updates: Partial<MenuItem>) => {
+  const updateMenuItem = async (id: string, updates: Partial<MenuItem>) => {
+    await api.admin.updateMenuItem(id, updates);
     setMenuItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
-    api.admin.updateMenuItem(id, updates).catch(() => {});
+    toast.success('Menu item updated');
   };
 
-  const deleteMenuItem = (id: string) => {
+  const deleteMenuItem = async (id: string) => {
+    await api.admin.deleteMenuItem(id);
     setMenuItems((prev) => prev.filter((item) => item.id !== id));
-    api.admin.deleteMenuItem(id).catch(() => {});
+    toast.success('Menu item deleted');
   };
 
-  const toggleItemAvailability = (id: string) => {
+  const toggleItemAvailability = async (id: string) => {
+    await api.admin.toggleItemAvailability(id);
     setMenuItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, isAvailable: !item.isAvailable } : item))
     );
-    api.admin.toggleItemAvailability(id).catch(() => {});
   };
 
   // Categories
-  const addCategory = (category: Omit<MenuCategory, 'id'>): MenuCategory => {
-    const tempId = `cat-${Date.now()}`;
+  const addCategory = async (category: Omit<MenuCategory, 'id'>): Promise<MenuCategory> => {
+    const res = await api.admin.createCategory({
+      name: category.name,
+      description: category.description,
+      sortOrder: category.sortOrder,
+    });
+    const created = res?.data || res;
     const newCat: MenuCategory = {
       ...category,
-      id: tempId,
+      id: created.id,
+      restaurantSlug: currentRestaurantSlug,
     };
     setCategories((prev) => [...prev, newCat]);
-
-    api.admin
-      .createCategory({
-        name: category.name,
-        description: category.description,
-        sortOrder: category.sortOrder,
-      })
-      .then((res) => {
-        if (res?.data?.id || res?.id) {
-          const realId = res?.data?.id || res?.id;
-          setCategories((prev) => prev.map((c) => (c.id === tempId ? { ...c, id: realId } : c)));
-        }
-      })
-      .catch(() => {});
-
+    toast.success(`Category "${category.name}" created`);
     return newCat;
   };
 
-  const updateCategory = (id: string, updates: Partial<MenuCategory>) => {
+  const updateCategory = async (id: string, updates: Partial<MenuCategory>) => {
+    await api.admin.updateCategory(id, updates);
     setCategories((prev) => prev.map((cat) => (cat.id === id ? { ...cat, ...updates } : cat)));
-    api.admin.updateCategory(id, updates).catch(() => {});
+    toast.success('Category updated');
   };
 
-  const deleteCategory = (id: string) => {
+  const deleteCategory = async (id: string) => {
+    await api.admin.deleteCategory(id);
     setCategories((prev) => prev.filter((cat) => cat.id !== id));
-    api.admin.deleteCategory(id).catch(() => {});
+    toast.success('Category deleted');
   };
 
   // Tables
-  const addTable = (table: Omit<TableItem, 'id'>): TableItem => {
-    const tempId = `tbl-${Date.now()}`;
+  const addTable = async (table: Omit<TableItem, 'id'>): Promise<TableItem> => {
+    const res = await api.admin.createTable({
+      tableNumber: table.tableNumber,
+      capacity: table.capacity,
+      status: table.status,
+    });
+    const created = res?.data || res;
     const newTable: TableItem = {
       ...table,
-      id: tempId,
+      id: created.id,
+      qrToken: created.qrToken,
     };
     setTables((prev) => [...prev, newTable]);
-
-    api.admin
-      .createTable({
-        tableNumber: table.tableNumber,
-        capacity: table.capacity,
-        status: table.status,
-      })
-      .then((res) => {
-        if (res?.data?.id || res?.id) {
-          const realId = res?.data?.id || res?.id;
-          setTables((prev) => prev.map((t) => (t.id === tempId ? { ...t, id: realId } : t)));
-        }
-      })
-      .catch(() => {});
-
+    toast.success(`Table "${table.tableNumber}" created`);
     return newTable;
   };
 
-  const updateTable = (id: string, updates: Partial<TableItem>) => {
+  const updateTable = async (id: string, updates: Partial<TableItem>) => {
+    await api.admin.updateTable(id, updates);
     setTables((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
-    api.admin.updateTable(id, updates).catch(() => {});
+    toast.success('Table updated');
   };
 
-  const deleteTable = (id: string) => {
+  const deleteTable = async (id: string) => {
+    await api.admin.deleteTable(id);
     setTables((prev) => prev.filter((t) => t.id !== id));
-    api.admin.deleteTable(id).catch(() => {});
+    toast.success('Table removed');
   };
 
   // Staff
-  const addStaff = (member: Omit<StaffMember, 'id' | 'joinedDate'>): StaffMember => {
-    const tempId = `staff-${Date.now()}`;
+  const addStaff = async (member: Omit<StaffMember, 'id' | 'joinedDate'>): Promise<StaffMember> => {
+    const res = await api.admin.createStaff({
+      email: member.email,
+      name: member.name,
+      role: member.role,
+    });
+    const created = res?.data || res;
     const newStaff: StaffMember = {
       ...member,
-      id: tempId,
+      id: created.id,
       joinedDate: new Date().toISOString().split('T')[0],
     };
     setStaff((prev) => [...prev, newStaff]);
-
-    api.admin
-      .createStaff({
-        email: member.email,
-        name: member.name,
-        role: member.role,
-      })
-      .then((res) => {
-        if (res?.data?.id || res?.id) {
-          const realId = res?.data?.id || res?.id;
-          setStaff((prev) => prev.map((s) => (s.id === tempId ? { ...s, id: realId } : s)));
-        }
-      })
-      .catch(() => {});
-
+    toast.success(`Staff member "${member.name}" registered`);
     return newStaff;
   };
 
-  const updateStaff = (id: string, updates: Partial<StaffMember>) => {
+  const updateStaff = async (id: string, updates: Partial<StaffMember>) => {
+    await api.admin.updateStaff(id, updates);
     setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
-    api.admin.updateStaff(id, updates).catch(() => {});
+    toast.success('Staff member updated');
   };
 
-  const deleteStaff = (id: string) => {
+  const deleteStaff = async (id: string) => {
+    await api.admin.deleteStaff(id);
     setStaff((prev) => prev.filter((s) => s.id !== id));
-    api.admin.deleteStaff(id).catch(() => {});
+    toast.success('Staff member removed');
   };
 
   // Settings
-  const updateRestaurantSettings = (updates: Partial<Restaurant>) => {
+  const updateRestaurantSettings = async (updates: Partial<Restaurant>) => {
+    await api.admin.updateSettings(updates);
     setRestaurants((prev) =>
       prev.map((r) => (r.slug === currentRestaurantSlug ? { ...r, ...updates } : r))
     );
-    api.admin.updateSettings(updates).catch(() => {});
+    toast.success('Restaurant settings saved');
   };
 
   // Superadmin
-  const updateRestaurantStatus = (id: string, status: 'ACTIVE' | 'SUSPENDED') => {
+  const updateRestaurantStatus = async (id: string, status: 'ACTIVE' | 'SUSPENDED') => {
+    await api.superadmin.updateTenantStatus(id, status);
     setRestaurants((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
-    api.superadmin.updateTenantStatus(id, status).catch(() => {});
+    toast.success(`Tenant status set to ${status}`);
   };
 
-  const addRestaurant = (
+  const addRestaurant = async (
     restaurant: Omit<Restaurant, 'id' | 'createdAt' | 'totalOrders' | 'totalRevenue'>
-  ): Restaurant => {
-    const tempId = `rest-${Date.now()}`;
+  ): Promise<Restaurant> => {
+    const res = await api.superadmin.createTenant({
+      name: restaurant.name,
+      slug: restaurant.slug,
+      cuisine: restaurant.cuisine,
+      address: restaurant.address,
+      phone: restaurant.phone,
+      email: restaurant.email,
+      currency: restaurant.currency,
+      taxRate: restaurant.taxRate,
+    });
+    const created = res?.data || res;
     const newRest: Restaurant = {
       ...restaurant,
-      id: tempId,
+      id: created.id,
       createdAt: new Date().toISOString(),
       totalOrders: 0,
       totalRevenue: 0,
     };
     setRestaurants((prev) => [newRest, ...prev]);
-
-    api.superadmin
-      .createTenant({
-        name: restaurant.name,
-        slug: restaurant.slug,
-        cuisine: restaurant.cuisine,
-        address: restaurant.address,
-        phone: restaurant.phone,
-        email: restaurant.email,
-        currency: restaurant.currency,
-        taxRate: restaurant.taxRate,
-      })
-      .then((res) => {
-        if (res?.data?.id || res?.id) {
-          const realId = res?.data?.id || res?.id;
-          setRestaurants((prev) => prev.map((r) => (r.id === tempId ? { ...r, id: realId } : r)));
-        }
-      })
-      .catch(() => {});
-
+    toast.success(`Restaurant "${restaurant.name}" provisioned`);
     return newRest;
   };
 
   const resetToInitialData = () => {
-    setRestaurants(INITIAL_RESTAURANTS);
-    setCategories(INITIAL_CATEGORIES);
-    setMenuItems(INITIAL_MENU_ITEMS);
-    setTables(INITIAL_TABLES);
-    setOrders(INITIAL_ORDERS);
-    setStaff(INITIAL_STAFF);
-    setCart([]);
-    localStorage.removeItem(`${STORAGE_KEY}_restaurants`);
-    localStorage.removeItem(`${STORAGE_KEY}_categories`);
-    localStorage.removeItem(`${STORAGE_KEY}_menuItems`);
-    localStorage.removeItem(`${STORAGE_KEY}_tables`);
-    localStorage.removeItem(`${STORAGE_KEY}_orders`);
-    localStorage.removeItem(`${STORAGE_KEY}_staff`);
-    localStorage.removeItem(`${STORAGE_KEY}_cart`);
+    clearCart();
+    refreshData();
   };
 
   return (

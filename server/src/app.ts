@@ -19,9 +19,26 @@ export const createApp = (): Application => {
 
   // Basic security and utility middleware
   app.use(helmet());
+  const allowedOrigins = [
+    config.frontendUrl,
+    'https://atharva1811.github.io',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ].filter(Boolean);
+
   app.use(
     cors({
-      origin: [config.frontendUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (
+          allowedOrigins.includes(origin) ||
+          origin.endsWith('.github.io') ||
+          origin.startsWith('http://localhost:')
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
       credentials: true,
     })
   );
@@ -32,14 +49,17 @@ export const createApp = (): Application => {
     app.use(morgan('dev'));
   }
 
-  // Health check endpoint
-  app.get('/health', (_req: Request, res: Response) => {
+  // Health check endpoints
+  const healthHandler = (_req: Request, res: Response) => {
     res.json({
       status: 'UP',
       timestamp: new Date().toISOString(),
       service: 'Sudarshan QR Backend',
+      version: '1.0.0',
     });
-  });
+  };
+  app.get('/health', healthHandler);
+  app.get('/api/health', healthHandler);
 
   // Mount domain routes
   app.use('/api/auth', authRoutes);

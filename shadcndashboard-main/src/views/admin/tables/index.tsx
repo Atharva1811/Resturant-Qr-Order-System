@@ -31,7 +31,7 @@ import {
 import { toast } from 'sonner';
 
 export default function RestaurantAdminTables() {
-  const { currentRestaurant, tables, addTable, updateTable, deleteTable } = useRestaurant();
+  const { currentRestaurant, tables, addTable, updateTable, deleteTable, refreshData } = useRestaurant();
   const [selectedTableForQr, setSelectedTableForQr] = useState<TableItem | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
@@ -60,30 +60,33 @@ export default function RestaurantAdminTables() {
     try {
       await api.admin.regenerateTableQr(selectedTableForQr.id);
       toast.success(`Generated fresh secure QR token for ${selectedTableForQr.tableNumber}`);
-    } catch {
-      toast.info(`Rotated QR token locally for ${selectedTableForQr.tableNumber}`);
+      await refreshData();
+    } catch (err: any) {
+      toast.error(err.message || `Failed to regenerate QR token for ${selectedTableForQr.tableNumber}`);
     } finally {
       setIsRegenerating(false);
     }
   };
 
-  const handleAddTable = (e: React.FormEvent) => {
+  const handleAddTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTableNumber.trim()) {
       toast.error('Table number is required.');
       return;
     }
 
-    const created = addTable({
-      restaurantSlug: currentRestaurant.slug,
-      tableNumber: newTableNumber.trim(),
-      capacity: parseInt(newCapacity, 10) || 4,
-      status: 'AVAILABLE',
-    });
-
-    toast.success(`Added ${created.tableNumber} with generated QR code.`);
-    setIsAddOpen(false);
-    setNewTableNumber('');
+    try {
+      await addTable({
+        restaurantSlug: currentRestaurant.slug,
+        tableNumber: newTableNumber.trim(),
+        capacity: parseInt(newCapacity, 10) || 4,
+        status: 'AVAILABLE',
+      });
+      setIsAddOpen(false);
+      setNewTableNumber('');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to add table on server');
+    }
   };
 
   return (

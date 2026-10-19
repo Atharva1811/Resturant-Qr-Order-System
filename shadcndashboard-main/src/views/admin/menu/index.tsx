@@ -110,7 +110,7 @@ export default function RestaurantAdminMenu() {
     setIsItemModalOpen(true);
   };
 
-  const handleSaveItem = (e: React.FormEvent) => {
+  const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     const priceNum = parseFloat(itemPrice);
     if (!itemName.trim() || isNaN(priceNum) || priceNum <= 0) {
@@ -118,55 +118,58 @@ export default function RestaurantAdminMenu() {
       return;
     }
 
-    if (editingItemId) {
-      updateMenuItem(editingItemId, {
-        name: itemName.trim(),
-        description: itemDesc.trim(),
-        price: priceNum,
-        categoryId: itemCatId,
-        imageUrl: itemImage.trim(),
-        isVeg: itemIsVeg,
-        prepTimeMinutes: parseInt(itemPrepTime, 10) || 10,
-        customizationGroups,
-      });
-      toast.success(`Updated "${itemName}" successfully.`);
-    } else {
-      addMenuItem({
-        restaurantSlug: currentRestaurant.slug,
-        name: itemName.trim(),
-        description: itemDesc.trim(),
-        price: priceNum,
-        categoryId: itemCatId,
-        imageUrl: itemImage.trim(),
-        isAvailable: true,
-        isVeg: itemIsVeg,
-        prepTimeMinutes: parseInt(itemPrepTime, 10) || 10,
-        customizationGroups,
-      });
-      toast.success(`Created "${itemName}" successfully.`);
+    try {
+      if (editingItemId) {
+        await updateMenuItem(editingItemId, {
+          name: itemName.trim(),
+          description: itemDesc.trim(),
+          price: priceNum,
+          categoryId: itemCatId,
+          imageUrl: itemImage.trim(),
+          isVeg: itemIsVeg,
+          prepTimeMinutes: parseInt(itemPrepTime, 10) || 10,
+          customizationGroups,
+        });
+      } else {
+        await addMenuItem({
+          restaurantSlug: currentRestaurant.slug,
+          name: itemName.trim(),
+          description: itemDesc.trim(),
+          price: priceNum,
+          categoryId: itemCatId,
+          imageUrl: itemImage.trim(),
+          isAvailable: true,
+          isVeg: itemIsVeg,
+          prepTimeMinutes: parseInt(itemPrepTime, 10) || 10,
+          customizationGroups,
+        });
+      }
+      setIsItemModalOpen(false);
+    } catch {
+      // Toast handled by context
     }
-
-    setIsItemModalOpen(false);
   };
 
-  const handleSaveCategory = (e: React.FormEvent) => {
+  const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName.trim()) {
       toast.error('Category name is required.');
       return;
     }
 
-    addCategory({
-      restaurantSlug: currentRestaurant.slug,
-      name: newCatName.trim(),
-      description: newCatDesc.trim(),
-      sortOrder: restaurantCategories.length + 1,
-    });
-
-    toast.success(`Category "${newCatName}" added.`);
-    setIsCatModalOpen(false);
-    setNewCatName('');
-    setNewCatDesc('');
+    try {
+      await addCategory({
+        restaurantSlug: currentRestaurant.slug,
+        name: newCatName.trim(),
+        description: newCatDesc.trim(),
+        sortOrder: restaurantCategories.length + 1,
+      });
+      setIsCatModalOpen(false);
+      setNewCatName('');
+      setNewCatDesc('');
+    } catch {
+      // Toast handled by context
+    }
   };
 
   const handleAddCustomizationGroup = () => {
