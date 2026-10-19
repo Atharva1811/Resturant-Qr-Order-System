@@ -46,7 +46,8 @@ export default function RestaurantAdminTables() {
 
   const getTableUrl = (tableItem: TableItem) => {
     const tableSlug = tableItem.tableNumber.toLowerCase().replace(/\s+/g, '-');
-    return `${window.location.origin}/m/${currentRestaurant.slug}/${tableSlug}`;
+    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+    return `${window.location.origin}${base}/m/${currentRestaurant.slug}/${tableSlug}`;
   };
 
   const handlePrint = () => {

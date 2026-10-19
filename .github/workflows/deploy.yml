@@ -1,0 +1,74 @@
+name: Deploy Sudarshan to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: shadcndashboard-main/package-lock.json
+
+      - name: Install dependencies
+        working-directory: shadcndashboard-main
+        run: npm ci
+
+      - name: Build frontend app
+        working-directory: shadcndashboard-main
+        env:
+          VITE_BASE_PATH: /Resturant-Qr-Order-System/
+        run: |
+          npm run build
+          # Ensure .nojekyll exists so GitHub Pages serves all assets
+          touch dist/.nojekyll
+          # Ensure 404.html exists for SPA client-side routing fallback
+          cp dist/index.html dist/404.html
+
+      # 1. Deploy to gh-pages branch (supports "Deploy from a branch" setting)
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: shadcndashboard-main/dist
+          force_orphan: true
+
+      # 2. Deploy directly via GitHub Pages Actions (supports "GitHub Actions" setting)
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        continue-on-error: true
+        with:
+          path: shadcndashboard-main/dist
+
+      - name: Deploy Pages artifact
+        id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v4

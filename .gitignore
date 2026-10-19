@@ -3,7 +3,8 @@ node_modules/
 dist/
 */dist/
 .env
-.env.local
+.env.*
+!.env.example
 *.log
 *.zip
 .DS_Store

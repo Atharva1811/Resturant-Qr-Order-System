@@ -9,16 +9,23 @@ import { ThemeProvider } from './context/shadcntheme/ThemeContext.tsx';
 async function deferRender() {
   const { worker } = await import('./api/mocks/browser.ts');
   return worker.start({
+    serviceWorker: {
+      url: `${import.meta.env.BASE_URL}mockServiceWorker.js`,
+    },
     onUnhandledRequest: 'bypass',
   });
 }
 
-deferRender().then(() => {
-  createRoot(document.getElementById('root')!).render(
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-      <Suspense fallback={<Spinner />}>
-        <App />
-      </Suspense>
-    </ThemeProvider>,
-  );
-});
+deferRender()
+  .catch((err) => {
+    console.warn('MSW worker failed to start, proceeding with app render:', err);
+  })
+  .then(() => {
+    createRoot(document.getElementById('root')!).render(
+      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+        <Suspense fallback={<Spinner />}>
+          <App />
+        </Suspense>
+      </ThemeProvider>,
+    );
+  });
