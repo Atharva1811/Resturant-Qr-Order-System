@@ -4,27 +4,30 @@
 
 [![Deploy to GitHub Pages](https://github.com/Atharva1811/Resturant-Qr-Order-System/actions/workflows/deploy.yml/badge.svg)](https://github.com/Atharva1811/Resturant-Qr-Order-System/actions/workflows/deploy.yml)
 [![Live Application](https://img.shields.io/badge/Live_App-GitHub_Pages-2ea44f?style=flat&logo=github)](https://atharva1811.github.io/Resturant-Qr-Order-System/)
-[![Backend Tests](https://img.shields.io/badge/Tests-52%20Passed-brightgreen)](file:///c:/Users/athar/OneDrive/Desktop/PROJECTS/Sudarshan/docs/TESTING_AND_ACCEPTANCE.md)
-[![Database](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20Prisma-blue)](file:///c:/Users/athar/OneDrive/Desktop/PROJECTS/Sudarshan/docs/DATABASE_SETUP.md)
+[![Backend Tests](https://img.shields.io/badge/Tests-75%20Passed-brightgreen)](./docs/TESTING.md)
+[![Database](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20Prisma-blue)](./docs/DATABASE_SETUP.md)
 
 ---
 
-## 📚 Handover Documentation Index
+## 📚 Handover Documentation Package
 
-For complete architectural specifications, deployment manuals, and verification evidence, see the dedicated documentation in [`docs/`](./docs/):
+For complete specifications, guides, and manuals, consult the documentation in [`docs/`](./docs/):
 
-- 🏛️ **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — Core responsibilities, directory structure, JWT & OTP auth flows, real-time Socket.IO protocols, and tenant isolation rules.
-- 🚀 **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** — Step-by-step production deployment manual for PostgreSQL, Render Web Service, and GitHub Pages.
-- 🔐 **[docs/ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md)** — Complete dictionary of all backend and frontend environment variables, secret classifications, and setup guides.
-- 🗄️ **[docs/DATABASE_SETUP.md](./docs/DATABASE_SETUP.md)** — PostgreSQL & Prisma schema, ER diagrams, migration workflows, seed data, and initial superadmin provisioning.
-- ✅ **[docs/TESTING_AND_ACCEPTANCE.md](./docs/TESTING_AND_ACCEPTANCE.md)** — Acceptance test matrix, Vitest test execution outputs, build evidence, and quality audit results.
-- 📋 **[docs/HANDOVER_CHECKLIST.md](./docs/HANDOVER_CHECKLIST.md)** — Developer onboarding, service account transfer checklist, and operational sign-off fields.
+1. 📋 **[`docs/PROJECT_AUDIT.md`](./docs/PROJECT_AUDIT.md)** — Comprehensive project feature inventory, verified modules, and status classification.
+2. 🏛️ **[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)** — Frontend/backend/database architecture, WebSocket protocols, and data flows.
+3. 🛠️ **[`docs/SETUP.md`](./docs/SETUP.md)** — Step-by-step local setup, required software, environment templates, and seeding commands.
+4. 🚀 **[`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md)** — Production deployment manual for PostgreSQL, Render, and GitHub Pages.
+5. 📱 **[`docs/QR_WORKFLOW.md`](./docs/QR_WORKFLOW.md)** — End-to-end QR code lifecycle, cryptographic token rotation, and customer routing.
+6. 🔐 **[`docs/SECURITY.md`](./docs/SECURITY.md)** — Authentication, RBAC matrix, row-level tenant isolation, and secret hygiene.
+7. ✅ **[`docs/TESTING.md`](./docs/TESTING.md)** — Vitest test execution outputs (75 tests), test suites, and manual acceptance test steps.
+8. 🔧 **[`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md)** — Diagnostic guides for "Failed to fetch", Mixed Content, Supabase pooling, and QR scanning.
+9. ⚙️ **[`docs/ENVIRONMENT_VARIABLES.md`](./docs/ENVIRONMENT_VARIABLES.md)** — Complete dictionary of all environment variables and secrets.
 
 ---
 
-## 🌐 Live GitHub Pages Deployment
+## 🌐 Application Architecture & Live URLs
 
-- **Application URL:** [https://atharva1811.github.io/Resturant-Qr-Order-System/](https://atharva1811.github.io/Resturant-Qr-Order-System/)
+- **Frontend Deployment (GitHub Pages):** [https://atharva1811.github.io/Resturant-Qr-Order-System/](https://atharva1811.github.io/Resturant-Qr-Order-System/)
 - **Backend API Service:** Render Node.js runtime with PostgreSQL.
 
 ### Core Product Modules
@@ -35,9 +38,9 @@ For complete architectural specifications, deployment manuals, and verification 
 | 📍 **Live Order Tracker** | `/m/:slug/:table/track/:orderId` | Customer tracking page connected to real-time status updates via WebSocket |
 | 👨‍🍳 **Kitchen Display (KDS)** | `/kitchen/orders` | Barista/chef touchscreen board with Web Audio alerts, ticket timers, and bump controls |
 | 📊 **Restaurant Admin Dashboard** | `/admin/dashboard` | Live revenue metrics, real order history, menu category manager, and table QR code generator |
-| 📋 **Orders Management** | `/admin/orders` | Filterable order queue with status transitions (Pending, Preparing, Ready, Delivered, Cancelled) |
+| 📋 **Orders Management** | `/admin/orders` | Filterable order queue with status transitions (New, Accepted, Preparing, Ready, Completed) |
 | 🍽️ **Menu & Pricing** | `/admin/menu` | Multi-category item catalog with availability toggles and customization groups |
-| 🪑 **Tables & QR Generator** | `/admin/tables` | Table capacity configuration, live QR preview, and printable table cards |
+| 🪑 **Tables & QR Generator** | `/admin/tables` | Table capacity configuration, live QR preview, printable cards, and token rotation |
 | 👥 **Staff Management** | `/admin/staff` | Role-based restaurant staff roster (Admin, Kitchen Staff, Waiter) |
 | 📈 **Sales Analytics** | `/admin/analytics` | Dynamic revenue, average ticket size, and bestselling item analytics |
 | ⚙️ **Restaurant Settings** | `/admin/settings` | Restaurant profile, dining room parameters, tax rate, and currency configuration |
@@ -46,96 +49,48 @@ For complete architectural specifications, deployment manuals, and verification 
 
 ---
 
-## ⚡ Quickstart: Local Development in 5 Minutes
+## ⚡ Quickstart: Local Development
 
-### 1. Prerequisites
-- **Node.js** v20.x or later
-- **npm** v10.x or later
-- **PostgreSQL** v14+ (or Docker)
-
-### 2. Clone and Configure Environment
-```bash
-# Clone the repository
-git clone https://github.com/Atharva1811/Resturant-Qr-Order-System.git
-cd Resturant-Qr-Order-System
-
-# Create environment files from templates
-cp server/.env.example server/.env
-cp shadcndashboard-main/.env.example shadcndashboard-main/.env
-```
-
-### 3. Setup Database & Backend
+### 1. Backend Setup (`server/`)
 ```bash
 cd server
-
-# Install dependencies
 npm install
+cp .env.example .env
 
-# Generate Prisma client and apply migrations
-npm run prisma:generate
-npx prisma migrate dev --name init
+# Generate Prisma client and deploy migrations
+npx prisma generate
+npx prisma migrate deploy
 
-# (Optional) Seed development demo restaurant & menu data
-npm run prisma:seed
+# Seed database and provision initial Superadmin
+npx tsx prisma/seed.ts
 
-# (Optional) Provision custom Superadmin
-npm run create:superadmin admin@servora.app "SuperSecretPassword123!" "Platform Superadmin"
-
-# Start backend dev server (port 5000)
+# Start development server on port 5000
 npm run dev
 ```
 
-### 4. Setup & Start Frontend
+### 2. Frontend Setup (`shadcndashboard-main/`)
 In a separate terminal:
 ```bash
 cd shadcndashboard-main
-
-# Install dependencies
 npm install
+cp .env.example .env
 
-# Start frontend dev server (port 5173)
+# Start frontend dev server on port 5173
 npm run dev
 ```
 
-Visit `http://localhost:5173/` in your browser.
-
 ---
 
-## 🛠️ Complete Scripts Reference
+## 📋 Developer Handover Checklist
 
-### Backend (`server/package.json`)
-| Script | Command | Purpose |
-| :--- | :--- | :--- |
-| `npm run dev` | `tsx watch src/index.ts` | Runs backend in development mode with hot reload. |
-| `npm run build` | `tsc` | Compiles TypeScript source to `dist/`. |
-| `npm start` | `node dist/index.js` | Runs compiled production server. |
-| `npm test` | `vitest run` | Executes all 52 unit and integration tests. |
-| `npm run prisma:generate` | `prisma generate` | Regenerates Prisma Client typings. |
-| `npm run prisma:push` | `prisma db push` | Pushes schema directly to database (rapid prototyping). |
-| `npm run prisma:migrate:deploy` | `prisma migrate deploy` | Safely executes pending database migrations in production. |
-| `npm run prisma:migrate:status` | `prisma migrate status` | Checks migration synchronization status. |
-| `npm run prisma:seed` | `tsx prisma/seed.ts` | Populates database with initial restaurants and menus. |
-| `npm run create:superadmin` | `tsx src/scripts/create-superadmin.ts` | Provisions a privileged superadmin account in PostgreSQL. |
-
-### Frontend (`shadcndashboard-main/package.json`)
-| Script | Command | Purpose |
-| :--- | :--- | :--- |
-| `npm run dev` | `vite` | Starts local development server on port 5173 with HMR. |
-| `npm run build` | `tsc && vite build` | Type-checks and builds optimized production bundle in `dist/`. |
-| `npm run preview` | `vite preview` | Serves local production build preview. |
-| `npm run lint` | `eslint . --ext ts,tsx` | Runs ESLint across all TypeScript and TSX files. |
-
----
-
-## 🔒 Security & Data Isolation Guarantees
-
-1. **No Direct Database Access from Browsers:** Browser code communicates exclusively via REST and WebSocket endpoints. `DATABASE_URL` is never exposed to the frontend.
-2. **Server-Side Authorization:** Role authorization (`requireRole`) and tenant boundary enforcement (`requireTenant`) are executed on Express routes. Frontend role routing is strictly a UI convenience; the API fails closed if authorization tokens are forged or unauthorized.
-3. **Password Hashing:** Passwords are never stored in plaintext and are hashed using bcrypt with 10 salt rounds. `passwordHash` is never returned in API payloads.
-4. **Idempotent Order Handling:** Orders are protected by an in-memory hash verification window to prevent accidental duplicate submission.
-
----
-
-## 📄 License & Attribution
-
-Servora is open-source software licensed under the [MIT License](./LICENSE). Reusable UI layout foundation incorporates open-source components from the shadcn/ui community.
+- [x] **Mock/test QR mode fully removed:** Zero mock fallbacks; failed requests produce meaningful errors.
+- [x] **No fake production authentication or persistence:** Argon2id + PostgreSQL verification required.
+- [x] **Frontend production build passes:** `tsc && vite build` builds in ~1.3s with zero type errors.
+- [x] **Real backend API configuration verified:** No hardcoded localhost or invented fake URLs in production.
+- [x] **Restaurant registration and login verified:** Transactional multi-tenant user and tenant provisioning.
+- [x] **Table creation and QR generation verified:** 32-hex cryptographic random tokens with high entropy.
+- [x] **QR opens the correct public customer page:** Canonical `/m/:slug/:table?token=...` with base path.
+- [x] **Orders persist and map to correct restaurant/table:** Server-side price recalculation & tax application.
+- [x] **Authorization and tenant isolation tested:** 11 Vitest test suites, 75 passing automated tests.
+- [x] **Deployment and environment instructions complete:** Comprehensive guides in `docs/`.
+- [x] **Known issues and unverified items disclosed:** Transparent reporting of live service dependencies.

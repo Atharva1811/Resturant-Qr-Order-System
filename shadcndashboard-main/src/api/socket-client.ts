@@ -1,6 +1,5 @@
 import { io, Socket } from 'socket.io-client';
 import { BRAND_CONFIG } from 'src/config/brand.config';
-import { isTestMode } from 'src/config/api.config';
 
 function resolveSocketUrl(): string {
   const envSocket = (import.meta.env.VITE_SOCKET_URL || '').trim();
@@ -31,8 +30,8 @@ const dummySocket = {
 } as unknown as Socket;
 
 export const getSocket = (): Socket => {
-  // If in Test Mode or no socket server is configured, return dummy stub
-  if (isTestMode() || !SOCKET_SERVER_URL) {
+  // If no socket server is configured, return safe dummy stub
+  if (!SOCKET_SERVER_URL) {
     return dummySocket;
   }
 

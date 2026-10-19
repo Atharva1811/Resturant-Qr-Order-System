@@ -4,7 +4,6 @@ import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext'
 import { TableItem } from 'src/context/restaurant-context/types';
 import api from 'src/api/api-client';
 import { BRAND_CONFIG } from 'src/config/brand.config';
-import { isTestMode } from 'src/config/api.config';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from 'src/components/ui/card';
 import { Badge } from 'src/components/ui/badge';
 import { Button } from 'src/components/ui/button';
@@ -50,15 +49,8 @@ export default function RestaurantAdminTables() {
   const getTableUrl = (tableItem: TableItem) => {
     const tableSlug = tableItem.tableNumber.toLowerCase().replace(/\s+/g, '-');
     const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-    const queryParts: string[] = [];
-    if (tableItem.qrToken) {
-      queryParts.push(`token=${encodeURIComponent(tableItem.qrToken)}`);
-    }
-    if (isTestMode()) {
-      queryParts.push('testMode=true');
-    }
-    const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-    return `${window.location.origin}${base}/m/${currentRestaurant.slug}/${tableSlug}${queryString}`;
+    const tokenQuery = tableItem.qrToken ? `?token=${encodeURIComponent(tableItem.qrToken)}` : '';
+    return `${window.location.origin}${base}/m/${currentRestaurant.slug}/${tableSlug}${tokenQuery}`;
   };
 
   const handlePrint = () => {
@@ -168,14 +160,7 @@ export default function RestaurantAdminTables() {
               <CardHeader className="pb-3 border-b border-border/70">
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-lg font-black text-foreground flex items-center gap-1.5">
-                      <span>{tbl.tableNumber}</span>
-                      {tbl.qrToken?.startsWith('test_token_') && (
-                        <Badge variant="outline" className="text-[9px] py-0 px-1 border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950/40">
-                          Preview
-                        </Badge>
-                      )}
-                    </CardTitle>
+                    <CardTitle className="text-lg font-black text-foreground">{tbl.tableNumber}</CardTitle>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                       <Users className="size-3 text-stone-400" />
                       <span>{tbl.capacity} Seats</span>
@@ -285,12 +270,6 @@ export default function RestaurantAdminTables() {
               <p className="text-xs text-stone-500 max-w-[220px] mt-1">
                 Point your phone's camera at the QR code to open the live menu and place your order.
               </p>
-
-              {selectedTableForQr.qrToken?.startsWith('test_token_') && (
-                <div className="mt-2 py-1 px-3 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 rounded-md text-[10px] font-semibold">
-                  Preview QR (Test Mode — Encodes live customer ordering URL for current deployment)
-                </div>
-              )}
 
               {/* Direct Copyable URL for Troubleshooting */}
               <div className="w-full mt-4 text-left">

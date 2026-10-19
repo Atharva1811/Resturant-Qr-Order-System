@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from 'src/api/api-client';
 import { BRAND_CONFIG } from 'src/config/brand.config';
-import { isTestMode, setTestMode } from 'src/config/api.config';
 import { onOrderCreated, onOrderStatusUpdated, joinRestaurantRoom } from 'src/api/socket-client';
 import {
   Role,
@@ -81,10 +80,8 @@ interface RestaurantContextType {
     restaurant: Omit<Restaurant, 'id' | 'createdAt' | 'totalOrders' | 'totalRevenue'>
   ) => Promise<Restaurant>;
 
-  // Backend Sync Status & Test Mode
+  // Backend Sync Status
   isBackendConnected: boolean;
-  isTestModeActive: boolean;
-  toggleTestMode: (enabled: boolean) => void;
   refreshData: () => Promise<void>;
 
   // Reset
@@ -140,17 +137,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(true);
-  const [isTestModeActive, setIsTestModeActive] = useState<boolean>(isTestMode());
-
-  useEffect(() => {
-    const handleModeChange = (e: any) => {
-      setIsTestModeActive(Boolean(e.detail?.enabled));
-    };
-    window.addEventListener('servora-test-mode-change', handleModeChange);
-    return () => {
-      window.removeEventListener('servora-test-mode-change', handleModeChange);
-    };
-  }, []);
 
   const currentRestaurant =
     restaurants.find((r) => r.slug === currentRestaurantSlug) ||
@@ -237,23 +223,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
       } else {
         setIsBackendConnected(false);
-      }
-
-      // If in Frontend Test Mode, load test tables automatically
-      if (isTestMode()) {
-        const testTables = await api.admin.getTables().catch(() => []);
-        if (Array.isArray(testTables) && testTables.length > 0) {
-          setTables(
-            testTables.map((t: any) => ({
-              id: t.id,
-              restaurantSlug: currentRestaurantSlug,
-              tableNumber: t.tableNumber,
-              capacity: t.capacity || 4,
-              status: t.status || 'AVAILABLE',
-              qrToken: t.qrToken,
-            }))
-          );
-        }
       }
 
       // 2. If authenticated token exists, fetch authorized tenant data
@@ -753,8 +722,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateRestaurantStatus,
         addRestaurant,
         isBackendConnected,
-        isTestModeActive,
-        toggleTestMode: setTestMode,
         refreshData,
         resetToInitialData,
       }}

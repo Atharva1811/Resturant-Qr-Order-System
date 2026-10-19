@@ -6,29 +6,21 @@ import { cn } from 'src/lib/utils';
 import Footer from './shared/footer/Footer';
 import { Outlet } from 'react-router';
 
-import TestModeBanner from 'src/components/shared/TestModeBanner';
-
 const FullLayout: FC = () => {
-
   return (
     <SidebarProvider
-           defaultOpen={true}
+      defaultOpen={true}
       style={{ "--sidebar-width-icon": "52px" } as React.CSSProperties}
     >
-      
-        <Sidebar />
-     
+      <Sidebar />
       <SidebarInset className="outline outline-border m-2 rounded-none! overflow-hidden">
-        {/* Test Mode / Backend Offline Warning Banner */}
-        <TestModeBanner />
+        {/* Top Header */}
+        <Header />
 
-        {/* Top Header  */}
-       <Header /> 
-        
-          {/* Body Content  */}
-          <div className="flex flex-1 flex-col gap-4 p-4">
+        {/* Body Content */}
+        <div className="flex flex-1 flex-col gap-4 p-4">
           <div className={cn("w-full mx-auto", "container")}>
-            <div className=" min-h-[calc(100vh-140px)]"><Outlet /></div>
+            <div className="min-h-[calc(100vh-140px)]"><Outlet /></div>
             <div className="pt-6">
               <Footer />
             </div>
