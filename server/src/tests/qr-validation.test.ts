@@ -21,7 +21,7 @@ describe('QR Code & Table Validation Tests', () => {
       'tok_abc123'
     );
 
-    expect(url).toBe('http://localhost:5173/customer/menu?slug=rustic-hearth&table=T-04&token=tok_abc123');
+    expect(url).toBe('http://localhost:5173/m/rustic-hearth/t-04?token=tok_abc123');
   });
 
   it('validates active table successfully when table and token match', async () => {

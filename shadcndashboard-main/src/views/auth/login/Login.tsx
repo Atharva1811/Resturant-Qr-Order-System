@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams, Link } from 'react-router';
 import { useRestaurant } from 'src/context/restaurant-context/RestaurantContext';
 import api from 'src/api/api-client';
 import { Card, CardContent } from 'src/components/ui/card';
@@ -179,7 +179,13 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="pt-2 text-center border-t border-border/60">
+          <div className="pt-3 text-center border-t border-border/60 space-y-1.5">
+            <p className="text-xs text-muted-foreground">
+              New restaurant partner?{' '}
+              <Link to="/register" className="font-bold text-amber-600 hover:underline">
+                Register Restaurant
+              </Link>
+            </p>
             <p className="text-[11px] text-muted-foreground">
               Authorized restaurant staff and administrators only.
             </p>

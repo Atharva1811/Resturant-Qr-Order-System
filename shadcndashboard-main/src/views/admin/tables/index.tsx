@@ -28,6 +28,7 @@ import {
   Sparkles,
   CheckCircle,
   RefreshCw,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -48,18 +49,54 @@ export default function RestaurantAdminTables() {
   const getTableUrl = (tableItem: TableItem) => {
     const tableSlug = tableItem.tableNumber.toLowerCase().replace(/\s+/g, '-');
     const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-    return `${window.location.origin}${base}/m/${currentRestaurant.slug}/${tableSlug}`;
+    const tokenQuery = tableItem.qrToken ? `?token=${encodeURIComponent(tableItem.qrToken)}` : '';
+    return `${window.location.origin}${base}/m/${currentRestaurant.slug}/${tableSlug}${tokenQuery}`;
   };
 
   const handlePrint = () => {
     window.print();
   };
 
+  const handleDownloadQr = () => {
+    if (!printRef.current) return;
+    const svg = printRef.current.querySelector('svg');
+    if (!svg) {
+      toast.error('Could not find QR element to download');
+      return;
+    }
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const downloadLink = document.createElement('a');
+    downloadLink.href = svgUrl;
+    downloadLink.download = `${currentRestaurant.slug}-${selectedTableForQr?.tableNumber.toLowerCase().replace(/\s+/g, '-')}-qr.svg`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(svgUrl);
+    toast.success('Downloaded table QR code (SVG)');
+  };
+
+  const handleCopyUrl = async () => {
+    if (!selectedTableForQr) return;
+    const url = getTableUrl(selectedTableForQr);
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Table ordering URL copied to clipboard');
+    } catch {
+      toast.error('Could not copy to clipboard');
+    }
+  };
+
   const handleRegenerateQr = async () => {
     if (!selectedTableForQr) return;
     setIsRegenerating(true);
     try {
-      await api.admin.regenerateTableQr(selectedTableForQr.id);
+      const res = await api.admin.regenerateTableQr(selectedTableForQr.id);
+      const updated = res?.data || res;
+      if (updated?.qrToken) {
+        setSelectedTableForQr((prev) => (prev ? { ...prev, qrToken: updated.qrToken } : null));
+      }
       toast.success(`Generated fresh secure QR token for ${selectedTableForQr.tableNumber}`);
       await refreshData();
     } catch (err: any) {
@@ -168,11 +205,11 @@ export default function RestaurantAdminTables() {
                   <span>View Card</span>
                 </Button>
 
-                <Link to={`/m/${currentRestaurant.slug}/${tbl.tableNumber.toLowerCase().replace(/\s+/g, '-')}`} target="_blank">
-                  <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground p-2">
+                <a href={tableUrl} target="_blank" rel="noopener noreferrer">
+                  <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground p-2" title="Open Customer Menu">
                     <ExternalLink className="size-3.5" />
                   </Button>
-                </Link>
+                </a>
 
                 <Button
                   variant="ghost"
@@ -234,38 +271,74 @@ export default function RestaurantAdminTables() {
                 Point your phone's camera at the QR code to open the live menu and place your order.
               </p>
 
+              {/* Direct Copyable URL for Troubleshooting */}
+              <div className="w-full mt-4 text-left">
+                <Label className="text-[11px] font-semibold text-stone-600">Customer Direct Ordering URL</Label>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <Input
+                    readOnly
+                    value={getTableUrl(selectedTableForQr)}
+                    className="h-8 text-xs font-mono bg-stone-50 border-stone-200 text-stone-700 select-all"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyUrl}
+                    className="h-8 px-2.5 text-xs font-semibold shrink-0 gap-1 border-stone-300 hover:bg-stone-100"
+                    title="Copy URL"
+                  >
+                    <Copy className="size-3.5" />
+                    <span>Copy</span>
+                  </Button>
+                </div>
+              </div>
+
               <div className="mt-3 text-[10px] text-stone-400 font-mono">
                 {BRAND_CONFIG.poweredBy}
               </div>
             </div>
 
-            <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-2">
+            <DialogFooter className="grid grid-cols-2 sm:flex sm:flex-row gap-2 mt-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRegenerateQr}
                 disabled={isRegenerating}
                 className="text-xs font-semibold gap-1.5 flex-1"
+                title="Revoke existing token and generate a new high-entropy token"
               >
                 <RefreshCw className={`size-3.5 ${isRegenerating ? 'animate-spin' : ''}`} />
                 <span>Rotate QR</span>
               </Button>
 
-              <Link
-                to={`/m/${currentRestaurant.slug}/${selectedTableForQr.tableNumber.toLowerCase().replace(/\s+/g, '-')}`}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadQr}
+                className="text-xs font-semibold gap-1.5 flex-1"
+                title="Download Stand Card QR as SVG"
+              >
+                <Download className="size-3.5" />
+                <span>SVG</span>
+              </Button>
+
+              <a
+                href={getTableUrl(selectedTableForQr)}
                 target="_blank"
-                className="w-full sm:w-auto flex-1"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto flex-1 inline-flex"
               >
                 <Button variant="outline" size="sm" className="w-full text-xs font-semibold gap-1.5">
                   <ExternalLink className="size-3.5" />
                   <span>Open Menu</span>
                 </Button>
-              </Link>
+              </a>
 
               <Button
                 size="sm"
                 onClick={handlePrint}
-                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold gap-1.5 flex-1"
+                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold gap-1.5 flex-1 col-span-2 sm:col-span-1"
               >
                 <Printer className="size-3.5" />
                 <span>Print Card</span>

@@ -16,15 +16,13 @@ export class QrService {
     baseUrl: string,
     restaurantSlug: string,
     tableNumber: string,
-    qrToken: string
+    qrToken?: string
   ): string {
     const cleanBase = baseUrl.replace(/\/+$/, '');
-    const params = new URLSearchParams({
-      slug: restaurantSlug,
-      table: tableNumber,
-      token: qrToken,
-    });
-    return `${cleanBase}/customer/menu?${params.toString()}`;
+    const cleanSlug = encodeURIComponent(restaurantSlug.trim().toLowerCase());
+    const tableSlug = encodeURIComponent(tableNumber.trim().toLowerCase().replace(/\s+/g, '-'));
+    const tokenQuery = qrToken ? `?token=${encodeURIComponent(qrToken.trim())}` : '';
+    return `${cleanBase}/m/${cleanSlug}/${tableSlug}${tokenQuery}`;
   }
 
   /**

@@ -32,6 +32,7 @@ import {
   ArrowRight,
   ShieldCheck,
   X,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -364,9 +365,21 @@ export default function CustomerMenuPage() {
 
           {/* Table QR Context Badge */}
           <div className="absolute top-4 right-4 z-10">
-            <Badge variant="outline" className="bg-black/40 text-stone-200 border-white/20 backdrop-blur-md text-[11px] py-1">
-              QR Verified
-            </Badge>
+            {tableVerified === true ? (
+              <Badge variant="outline" className="bg-emerald-950/60 text-emerald-300 border-emerald-500/30 backdrop-blur-md text-[11px] py-1 flex items-center gap-1">
+                <ShieldCheck className="size-3 text-emerald-400" />
+                <span>Verified Stand</span>
+              </Badge>
+            ) : tableVerified === false ? (
+              <Badge variant="outline" className="bg-rose-950/60 text-rose-300 border-rose-500/30 backdrop-blur-md text-[11px] py-1 flex items-center gap-1">
+                <AlertCircle className="size-3 text-rose-400" />
+                <span>Unverified Table</span>
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="bg-black/40 text-stone-200 border-white/20 backdrop-blur-md text-[11px] py-1">
+                Validating...
+              </Badge>
+            )}
           </div>
 
           {/* Restaurant Profile Info */}
@@ -375,6 +388,17 @@ export default function CustomerMenuPage() {
             <p className="text-xs text-stone-200 mt-0.5 line-clamp-1">{currentRestaurant.cuisine}</p>
           </div>
         </div>
+
+        {/* Verification Warning Alert */}
+        {tableError && (
+          <div className="mx-4 mt-3 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 rounded-xl flex items-start gap-2.5 text-rose-900 dark:text-rose-200 text-xs shadow-xs">
+            <AlertCircle className="size-4 shrink-0 text-rose-600 mt-0.5" />
+            <div>
+              <p className="font-bold">Table Stand Verification Notice</p>
+              <p className="mt-0.5 text-rose-800 dark:text-rose-300">{tableError}</p>
+            </div>
+          </div>
+        )}
 
         {/* Search & Dietary Filter */}
         <div className="p-4 space-y-3 bg-card border-b border-border sticky top-0 z-20 shadow-xs">

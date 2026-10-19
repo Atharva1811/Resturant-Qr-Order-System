@@ -75,6 +75,27 @@ export const api = {
       }
       return res;
     },
+    registerRestaurant: async (payload: {
+      restaurantName: string;
+      slug?: string;
+      cuisine?: string;
+      address?: string;
+      phone?: string;
+      adminName: string;
+      adminEmail: string;
+      password: string;
+      currency?: string;
+      taxRate?: number;
+    }) => {
+      const res = await request<{ token: string; user: any }>('/auth/register-restaurant', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      if (res?.token) {
+        localStorage.setItem(BRAND_CONFIG.authTokenKey, res.token);
+      }
+      return res;
+    },
     getMe: () => request('/auth/me'),
     logout: () => {
       localStorage.removeItem(BRAND_CONFIG.authTokenKey);

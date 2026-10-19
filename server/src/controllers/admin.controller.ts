@@ -401,6 +401,16 @@ export const regenerateTableQrToken = async (req: AuthenticatedRequest, res: Res
   try {
     const { id } = req.params;
     const restaurantId = req.restaurantId!;
+
+    const existing = await prisma.table.findFirst({
+      where: { id, restaurantId },
+    });
+
+    if (!existing) {
+      res.status(404).json({ success: false, error: 'Table not found for this restaurant' });
+      return;
+    }
+
     const newQrToken = qrService.generateQrToken();
 
     const table = await prisma.table.update({
@@ -423,11 +433,38 @@ export const deleteTable = async (req: AuthenticatedRequest, res: Response, next
     const { id } = req.params;
     const restaurantId = req.restaurantId!;
 
-    await prisma.table.deleteMany({
+    const existing = await prisma.table.findFirst({
       where: { id, restaurantId },
     });
 
-    res.json({ success: true, message: 'Table deleted' });
+    if (!existing) {
+      res.status(404).json({ success: false, error: 'Table not found for this restaurant' });
+      return;
+    }
+
+    const orderCount = await prisma.order.count({
+      where: { tableId: id },
+    });
+
+    if (orderCount > 0) {
+      // Deactivate table to preserve foreign key order history integrity
+      const deactivated = await prisma.table.update({
+        where: { id },
+        data: { status: 'RESERVED' },
+      });
+      res.json({
+        success: true,
+        message: 'Table has associated order history and was safely deactivated instead of deleted.',
+        data: deactivated,
+      });
+      return;
+    }
+
+    await prisma.table.delete({
+      where: { id },
+    });
+
+    res.json({ success: true, message: 'Table deleted successfully' });
   } catch (error) {
     next(error);
   }

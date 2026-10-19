@@ -98,3 +98,15 @@ export const loginLimiter = createRateLimiter({
   message: 'Too many login attempts. Please wait 15 minutes before trying again.',
 });
 
+// Specialized Auth register limiter: max 5 registration attempts per 15 minutes per IP
+export const registerLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 5,
+  keyGenerator: (req) => {
+    const ip = req.ip || req.socket.remoteAddress || 'no-ip';
+    return `register_${ip}`;
+  },
+  message: 'Too many registration requests from this network. Please wait 15 minutes before trying again.',
+});
+
+
