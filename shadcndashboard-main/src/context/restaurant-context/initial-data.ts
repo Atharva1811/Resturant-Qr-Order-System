@@ -234,7 +234,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     description: 'Hand-cut ribbon pasta, brown butter sage emulsification, pan-seared chanterelles, shaved black summer truffle.',
     price: 23.5,
     imageUrl: 'https://images.unsplash.com/photo-1621996346565-e3d5d6281729?w=600&auto=format&fit=crop&q=80',
-    isAvailable: false, // Demo sold-out state!
+    isAvailable: false,
     isVeg: true,
     prepTimeMinutes: 14,
   },
@@ -268,7 +268,7 @@ export const INITIAL_TABLES: TableItem[] = [
   { id: 'tbl-1', restaurantSlug: 'rustic-hearth', tableNumber: 'Table 1', capacity: 2, status: 'OCCUPIED' },
   { id: 'tbl-2', restaurantSlug: 'rustic-hearth', tableNumber: 'Table 2', capacity: 2, status: 'AVAILABLE' },
   { id: 'tbl-3', restaurantSlug: 'rustic-hearth', tableNumber: 'Table 3', capacity: 4, status: 'OCCUPIED' },
-  { id: 'tbl-4', restaurantSlug: 'rustic-hearth', tableNumber: 'Table 4', capacity: 4, status: 'OCCUPIED' }, // Current demo table!
+  { id: 'tbl-4', restaurantSlug: 'rustic-hearth', tableNumber: 'Table 4', capacity: 4, status: 'OCCUPIED' },
   { id: 'tbl-5', restaurantSlug: 'rustic-hearth', tableNumber: 'Table 5', capacity: 6, status: 'AVAILABLE' },
   { id: 'tbl-6', restaurantSlug: 'rustic-hearth', tableNumber: 'Table 6', capacity: 8, status: 'RESERVED' },
   { id: 'tbl-7', restaurantSlug: 'rustic-hearth', tableNumber: 'Patio P1', capacity: 4, status: 'AVAILABLE' },

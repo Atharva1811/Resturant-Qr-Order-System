@@ -28,7 +28,7 @@ const CustomerMenuPage = Loadable(lazy(() => import('../views/customer/menu')));
 const CustomerOrderTrackingPage = Loadable(lazy(() => import('../views/customer/track')));
 
 /* ***Auth & Error Views**** */
-const Login = Loadable(lazy(() => import('../views/auth/login/DemoLogin')));
+const Login = Loadable(lazy(() => import('../views/auth/login/Login')));
 const UnauthorizedPage = Loadable(lazy(() => import('../views/auth/error/Unauthorized')));
 const ForbiddenPage = Loadable(lazy(() => import('../views/auth/error/Forbidden')));
 const SystemErrorPage = Loadable(lazy(() => import('../views/auth/error/SystemError')));
@@ -75,6 +75,7 @@ const Router = [
 
       // Authentication
       { path: '/login', element: <Login /> },
+      { path: '/auth/login', element: <Login /> },
 
       // Error / Access routes
       { path: '/unauthorized', element: <UnauthorizedPage /> },

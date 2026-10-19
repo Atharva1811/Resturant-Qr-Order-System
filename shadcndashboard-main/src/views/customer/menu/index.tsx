@@ -901,11 +901,6 @@ export default function CustomerMenuPage() {
                 </p>
               </div>
 
-              {/* Demo Helper Banner */}
-              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl p-2.5 text-xs text-amber-800 dark:text-amber-200">
-                <span className="font-bold">Phase 1 Demo Code:</span> Enter <span className="font-mono font-black text-amber-950 dark:text-amber-100">123456</span> or any 6 digits
-              </div>
-
               <div className="flex justify-center py-2">
                 <InputOTP maxLength={6} value={otpCode} onChange={(val) => setOtpCode(val)}>
                   <InputOTPGroup className="gap-1.5 *:data-[slot=input-otp-slot]:rounded-lg *:data-[slot=input-otp-slot]:size-10">
@@ -925,17 +920,6 @@ export default function CustomerMenuPage() {
               >
                 Verify & Continue
               </Button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setOtpCode('123456');
-                  toast.info('Auto-filled demo code: 123456');
-                }}
-                className="text-xs text-amber-600 hover:underline block mx-auto font-medium"
-              >
-                Auto-fill Demo Code (123456)
-              </button>
             </div>
           )}
 
@@ -976,11 +960,12 @@ export default function CustomerMenuPage() {
               {paymentMethod === 'ONLINE' ? (
                 <div className="bg-muted/40 p-3 rounded-xl border border-border space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-foreground">Instant Demo Gateway</span>
-                    <Badge variant="outline" className="text-[10px] text-emerald-700 bg-emerald-50">Demo Sandbox</Badge>
+                    <span className="font-semibold text-foreground">Digital & Card Payment</span>
+                    <Badge variant="outline" className="text-[10px] text-emerald-700 bg-emerald-50">SSL Secure</Badge>
                   </div>
-                  <Input readOnly value="4242 •••• •••• 4242" className="h-8 text-xs bg-background font-mono" />
-                  <p className="text-[10px] text-muted-foreground">Demo mock card preloaded for testing.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Online payments are processed securely upon order placement. A confirmation receipt will be emailed to you.
+                  </p>
                 </div>
               ) : (
                 <div className="bg-muted/40 p-3 rounded-xl border border-border text-xs text-muted-foreground">

@@ -62,6 +62,74 @@ describe('Phase 4: Comprehensive Production & Security Audit Test Suite', () => 
       expect(res.body.error).toContain('Invalid email or password');
     });
 
+    it('rejects authentication for inactive or disabled accounts (401)', async () => {
+      const mockPasswordHash = await bcrypt.hash('CorrectPassword123!', 10);
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValueOnce({
+        id: 'u-admin-disabled',
+        email: 'disabled@rustic.com',
+        passwordHash: mockPasswordHash,
+        isActive: false,
+      } as any);
+
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'disabled@rustic.com', password: 'CorrectPassword123!' });
+
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Invalid email or password');
+    });
+
+    it('rejects authentication for users belonging to suspended restaurant accounts (403)', async () => {
+      const mockPasswordHash = await bcrypt.hash('CorrectPassword123!', 10);
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValueOnce({
+        id: 'u-admin-suspended',
+        email: 'admin@suspended.com',
+        passwordHash: mockPasswordHash,
+        role: 'RESTAURANT_ADMIN',
+        isActive: true,
+        restaurant: {
+          id: 'rest-suspended',
+          status: 'SUSPENDED',
+        },
+      } as any);
+
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'admin@suspended.com', password: 'CorrectPassword123!' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('suspended');
+    });
+
+    it('guarantees passwordHash is never returned in login response body', async () => {
+      const mockPasswordHash = await bcrypt.hash('SecurePass123!', 10);
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValueOnce({
+        id: 'u-admin-2',
+        email: 'admin2@rustic.com',
+        name: 'Rustic Admin 2',
+        passwordHash: mockPasswordHash,
+        role: 'RESTAURANT_ADMIN',
+        restaurantId: 'rest-1',
+        isActive: true,
+        restaurant: {
+          id: 'rest-1',
+          name: 'The Rustic Hearth',
+          slug: 'rustic-hearth',
+          currency: 'USD',
+        },
+      } as any);
+
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'admin2@rustic.com', password: 'SecurePass123!' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.passwordHash).toBeUndefined();
+      expect(JSON.stringify(res.body)).not.toContain(mockPasswordHash);
+    });
+
     it('rejects expired JWT session tokens with 401 Unauthorized', async () => {
       const expiredToken = jwt.sign(
         { userId: 'u-1', email: 'test@domain.com', role: 'RESTAURANT_ADMIN' },

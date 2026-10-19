@@ -153,12 +153,14 @@ export default function SuperadminRestaurantDetail() {
 
         <Card className="border border-border shadow-xs">
           <CardHeader>
-            <CardTitle className="text-base font-bold text-foreground">Billing & SaaS Parameters</CardTitle>
+            <CardTitle className="text-base font-bold text-foreground">Financial & Tenant Configuration</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3.5 text-xs">
             <div className="flex justify-between py-1 border-b border-border/60">
-              <span className="text-muted-foreground">Subscription Plan</span>
-              <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">Enterprise Pro</Badge>
+              <span className="text-muted-foreground">Account Status</span>
+              <Badge variant="outline" className={tenant.status === 'ACTIVE' ? 'text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40' : 'text-rose-600 border-rose-200 bg-rose-50 dark:bg-rose-950/40'}>
+                {tenant.status}
+              </Badge>
             </div>
             <div className="flex justify-between py-1 border-b border-border/60">
               <span className="text-muted-foreground">Configured Sales Tax</span>

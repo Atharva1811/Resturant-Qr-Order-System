@@ -219,7 +219,7 @@ export default function SuperadminOverview() {
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div>
             <CardTitle className="text-base font-bold text-foreground">Tenant Restaurants</CardTitle>
-            <p className="text-xs text-muted-foreground">Manage subscriptions, account status, and credentials</p>
+            <p className="text-xs text-muted-foreground">Manage tenant operating status, configurations, and credentials</p>
           </div>
           <Link to="/superadmin/restaurants">
             <Button variant="ghost" size="sm" className="text-xs text-purple-600 gap-1 font-semibold">

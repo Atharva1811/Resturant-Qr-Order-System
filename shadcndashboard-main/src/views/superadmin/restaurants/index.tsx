@@ -127,7 +127,7 @@ export default function SuperadminRestaurants() {
             <span>Restaurant Directory & Tenants</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Manage multi-tenant partners, subscriptions, and access privileges
+            Manage multi-tenant restaurant partners, operational status, and access privileges
           </p>
         </div>
 

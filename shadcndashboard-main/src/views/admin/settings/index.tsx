@@ -113,7 +113,7 @@ export default function RestaurantAdminSettings() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">Invoicing & Notification Email</Label>
+                <Label className="text-xs font-semibold">Official Contact & Notification Email</Label>
                 <Input
                   type="email"
                   value={email}
@@ -130,7 +130,7 @@ export default function RestaurantAdminSettings() {
           <CardHeader className="pb-3 border-b border-border">
             <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
               <DollarSign className="size-4 text-amber-600" />
-              <span>Billing & Currency Setup</span>
+              <span>Currency & Tax Calculation</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-5 space-y-4">
